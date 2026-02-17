@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <h1>薬歴AIブラッシュアップ</h1>
+    <p class="description">AIプロバイダーとAPIキーを設定</p>
+
+    <div class="form-group">
+      <label>AIプロバイダー</label>
+      <div class="provider-toggle">
+        <button type="button" class="provider-btn active" data-provider="gemini">Gemini</button>
+        <button type="button" class="provider-btn" data-provider="openai">OpenAI</button>
+        <button type="button" class="provider-btn" data-provider="claude">Claude</button>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="apiKey">APIキー</label>
+      <input type="password" id="apiKey" placeholder="APIキーを入力">
+      <p class="api-link" id="apiLink">
+        <a href="https://aistudio.google.com/apikey" target="_blank" id="apiLinkAnchor">APIキーを取得する</a>
+      </p>
+    </div>
+
+    <div class="form-group">
+      <label>モデル</label>
+      <div class="model-toggle" id="modelToggle"></div>
+      <p class="model-hint" id="modelHint"></p>
+    </div>
+
+    <button id="saveBtn">保存</button>
+    <div id="status" class="status"></div>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>
