@@ -60,21 +60,26 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         const leftEl = document.getElementById("left");
         if (leftEl) {
           const rawPast = leftEl.innerText || leftEl.textContent || "";
-          pastData = rawPast.split("\n").filter(line => !line.includes("支B")).join("\n");
+          pastData = rawPast.split("\n").filter(line => !/支\s*[BＢb]/.test(line)).join("\n");
         }
 
-        // 2. 次に #this-time から処方内容を取得し、支Bフラグを判定
+        // 2. 次に #this-time から処方内容を取得し、支Bフラグ・薬Bフラグを判定
         let prescription = "";
         let hasShiB = false;
+        let hasYakuB = false;
         const thisTimeEl = document.getElementById("this-time");
         if (thisTimeEl) {
           prescription = thisTimeEl.innerText || thisTimeEl.textContent || "";
-          hasShiB = /支B/.test(prescription);
+          hasShiB = /支\s*[BＢb]/.test(prescription);
+          hasYakuB = /薬\s*[BＢb]/.test(prescription);
         }
 
-        console.log("[薬歴AI] hasShiB:", hasShiB, "prescription:", prescription.substring(0, 100));
+        console.log("[薬歴AI] hasShiB:", hasShiB, "hasYakuB:", hasYakuB, "prescription:", prescription.substring(0, 200));
+        // デバッグ：薬・支を含む行を出力
+        const flagLines = prescription.split("\n").filter(line => /[薬支]/.test(line));
+        if (flagLines.length > 0) console.log("[薬歴AI] フラグ関連行:", flagLines);
 
-        sendResponse({ value, prescription: prescription.trim(), pastData: pastData.trim(), hasShiB });
+        sendResponse({ value, prescription: prescription.trim(), pastData: pastData.trim(), hasShiB, hasYakuB });
       } else {
         sendResponse({ value: null });
       }
