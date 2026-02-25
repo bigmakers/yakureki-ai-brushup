@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>薬歴AIナビゲーション — AI指示内容まとめ</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic", "Meiryo", sans-serif; background: #f5f7fa; color: #333; line-height: 1.7; padding: 20px; }
+  .container { max-width: 960px; margin: 0 auto; }
+  h1 { font-size: 22px; color: #1a73e8; border-bottom: 3px solid #1a73e8; padding-bottom: 8px; margin-bottom: 24px; }
+  h2 { font-size: 18px; color: #fff; background: #1a73e8; padding: 8px 16px; border-radius: 6px; margin: 32px 0 16px; }
+  h3 { font-size: 15px; color: #1a73e8; border-left: 4px solid #1a73e8; padding-left: 10px; margin: 20px 0 10px; }
+  h4 { font-size: 14px; color: #333; margin: 14px 0 8px; padding: 4px 8px; background: #e8f0fe; border-radius: 4px; }
+  p, li { font-size: 13px; }
+  p { margin: 6px 0; }
+  ul { padding-left: 20px; margin: 6px 0; }
+  li { margin: 3px 0; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 16px; font-size: 13px; }
+  th { background: #e8f0fe; color: #1a73e8; font-weight: 600; text-align: left; padding: 8px 10px; border: 1px solid #d0d7de; }
+  td { padding: 8px 10px; border: 1px solid #d0d7de; vertical-align: top; background: #fff; }
+  tr:hover td { background: #f8fafd; }
+  .card { background: #fff; border-radius: 8px; padding: 20px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+  .badge { display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 10px; margin-right: 4px; }
+  .badge-soap { background: #e8f0fe; color: #1a73e8; }
+  .badge-oap { background: #fef7e0; color: #b06000; }
+  .badge-a { background: #e6f4ea; color: #137333; }
+  .badge-off { background: #f1f3f4; color: #5f6368; }
+  .warn { color: #d93025; font-weight: 600; }
+  .note { background: #fef7e0; border-left: 4px solid #f9ab00; padding: 8px 12px; margin: 10px 0; border-radius: 0 4px 4px 0; font-size: 13px; }
+  .code { background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-family: "Consolas", "Monaco", monospace; font-size: 12px; }
+  hr { border: none; border-top: 1px solid #e0e0e0; margin: 24px 0; }
+  .flag-regex { font-family: "Consolas", monospace; font-size: 12px; background: #f1f3f4; padding: 1px 4px; border-radius: 2px; }
+  .toc { background: #fff; border-radius: 8px; padding: 16px 20px; margin-bottom: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+  .toc h3 { border-left: none; padding-left: 0; color: #333; font-size: 14px; margin: 0 0 8px; }
+  .toc ol { padding-left: 20px; }
+  .toc li { margin: 4px 0; }
+  .toc a { color: #1a73e8; text-decoration: none; font-size: 13px; }
+  .toc a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>薬歴AIナビゲーション — AI指示内容まとめ</h1>
+
+<div class="toc">
+  <h3>目次</h3>
+  <ol>
+    <li><a href="#mode">モード概要</a></li>
+    <li><a href="#type">処方タイプ別の書き分けルール</a></li>
+    <li><a href="#flag">フラグ別ルール一覧</a></li>
+    <li><a href="#prohibit">禁止事項</a></li>
+    <li><a href="#focus">重視項目（ユーザー設定）</a></li>
+    <li><a href="#highrisk">ハイリスク薬ルール</a></li>
+    <li><a href="#pastdata">過去データの取り扱い</a></li>
+    <li><a href="#check">整合性チェック一覧</a></li>
+    <li><a href="#misc">申し送り自動抽出</a></li>
+  </ol>
+</div>
+
+<!-- ===== 1. モード概要 ===== -->
+<h2 id="mode">1. モード概要</h2>
+<div class="card">
+  <table>
+    <tr><th>モード</th><th>コンテキストメニュー</th><th>出力セクション</th><th>書き込み動作</th></tr>
+    <tr>
+      <td><span class="badge badge-soap">SOAP</span></td>
+      <td>薬歴をAIでナビゲーション（SOAP）</td>
+      <td>【S】【O】【A】【P】</td>
+      <td><strong>上書き</strong></td>
+    </tr>
+    <tr>
+      <td><span class="badge badge-oap">OAP</span></td>
+      <td>薬歴をAIでナビゲーション（OAP）</td>
+      <td>【O】【A】【P】</td>
+      <td><strong>追記</strong></td>
+    </tr>
+    <tr>
+      <td><span class="badge badge-a">A単独</span></td>
+      <td>薬歴をAIでナビゲーション（A）</td>
+      <td>【A】のみ</td>
+      <td><strong>追記</strong></td>
+    </tr>
+  </table>
+  <ul>
+    <li>SOAPモード：テキストエリアの内容を全置換する</li>
+    <li>OAP / A単独モード：既存テキストの末尾に改行2つ挟んで追記する</li>
+  </ul>
+</div>
+
+<!-- ===== 2. 処方タイプ別 ===== -->
+<h2 id="type">2. 処方タイプ別の書き分けルール</h2>
+<div class="card">
+  <p>AIはまず処方内容を分析し、処方タイプを判断してから書き分ける。</p>
+
+  <h3>2-1. 内服薬が含まれる場合</h3>
+
+  <h4>【S】（SOAPモードのみ）</h4>
+  <ul>
+    <li><strong>初回投薬</strong>：その薬が必要になった症状・訴えを記載（<span class="warn">「特に変わりない」は禁止</span>）</li>
+    <li><strong>追加処方</strong>：新しい薬が必要になった症状・訴えを記載（<span class="warn">「体調変わりない」は禁止</span>）</li>
+    <li><strong>定期処方のみ</strong>：患者の訴えを記載（体調良好、特になし等）</li>
+    <li>前回の【P】の内容についても問題なかった旨を記載</li>
+  </ul>
+
+  <h4>【O】（SOAP / OAPモード）</h4>
+  <ul>
+    <li>客観的所見を記載</li>
+    <li>副作用確認（「〜→なし」）は<strong>定期処方の薬のみ</strong>（ランダムに2種類選択）</li>
+    <li><span class="warn">初回投薬・追加処方の薬はOで副作用確認しない</span>（まだ服用開始前のため）</li>
+    <li>薬品名ごとに改行して見やすく記載</li>
+    <li>過去2回との医薬品一致率50%以上で「定期処方」と記載</li>
+    <li>過去からの変更点（追加・削除・用量変更）を具体的に記載</li>
+  </ul>
+
+  <h4>【A】（全モード共通）</h4>
+  <ul>
+    <li>服薬状況良好と判断した旨を記載</li>
+    <li>定期処方薬：ランダムに1種類選び処方妥当性を記載</li>
+    <li>初回投薬・追加処方：想定される副作用の注意喚起（<strong>Oではなく、Aで行う</strong>）</li>
+    <li>生活上・服薬上の問いかけを疑問文で記載</li>
+    <li><span class="warn">「次回までに〜」は使わない</span></li>
+  </ul>
+
+  <h4>【P】（SOAP / OAPモード）</h4>
+  <ul>
+    <li>次回経過観察とする</li>
+    <li>定期処方薬：Aの問いに対し「今回はみられないが引き続き経過観察」形式</li>
+    <li>初回投薬・追加処方・用量変更の薬：Aで注意喚起した副作用を次回確認事項として記載</li>
+    <li>ランダムに1種類選び次回確認すべき副作用を記載</li>
+    <li><span class="warn">「問題なかった」「問題ない」「問題なさそう」は禁止</span></li>
+  </ul>
+
+  <hr>
+
+  <h3>2-2. 外用薬のみの場合</h3>
+  <table>
+    <tr><th>セクション</th><th>内容</th></tr>
+    <tr><td>【S】</td><td>患者の訴え、使用部位の状態</td></tr>
+    <tr><td>【O】</td><td>使用部位の状態、使用状況</td></tr>
+    <tr><td>【A】</td><td>塗布して様子見、複数あれば併用問題なし</td></tr>
+    <tr><td>【P】</td><td>次回経過観察、使用部位の状態確認</td></tr>
+  </table>
+
+  <h3>2-3. 便秘薬の場合</h3>
+  <p style="font-size:12px;color:#666;">テレミンソフト坐薬、センノシド錠、ピコスルファートナトリウム等、「便秘時」用法</p>
+  <table>
+    <tr><th>セクション</th><th>内容</th></tr>
+    <tr><td>【S】</td><td>便通に問題がある旨（<span class="warn">「体調変わりない」「便通問題ない」は禁止</span>）</td></tr>
+    <tr><td>【O】</td><td>便通の状況、過去に他の便秘薬あれば効果不十分の旨</td></tr>
+    <tr><td>【A】</td><td>使用して様子見</td></tr>
+    <tr><td>【P】</td><td>改善傾向か悪化していないか確認（<span class="warn">「便通は問題なかった」は禁止</span>）</td></tr>
+  </table>
+
+  <h3>2-4. 湿布・貼付薬の場合</h3>
+  <p style="font-size:12px;color:#666;">アドフィードパップ、ロキソプロフェンテープ、モーラステープ等</p>
+  <table>
+    <tr><th>セクション</th><th>内容</th></tr>
+    <tr><td>【S】</td><td>貼付部位の痛み、使用部位（胸部、腰部、両膝等）</td></tr>
+    <tr><td>【O】</td><td>疼痛の状況、使用部位を明記</td></tr>
+    <tr><td>【A】</td><td>貼付して様子見</td></tr>
+    <tr><td>【P】</td><td>疼痛の改善状況を確認</td></tr>
+  </table>
+
+  <h3>2-5. 内服薬＋便秘薬の併用ルール</h3>
+  <p>内服薬の副作用として便秘が考えられる薬（抗コリン薬、オピオイド、Ca拮抗薬、鉄剤等）と便秘薬が同時処方の場合：</p>
+  <ul>
+    <li><strong>S</strong>：便秘の症状がある旨を記載</li>
+    <li><strong>A</strong>：該当内服薬の副作用として便秘の注意喚起 + 水分摂取・服薬継続の文言</li>
+    <li><strong>P</strong>：便秘が悪化していないか、改善傾向にあるか確認</li>
+  </ul>
+
+  <h3>2-6. 酢酸亜鉛（ノベルジン等）</h3>
+  <div class="note">重要：乳幼児は味覚異常を訴えられないため「味覚障害」「味覚異常」を処方理由として記載しない。</div>
+  <table>
+    <tr><th>対象</th><th>S</th><th>O</th><th>A</th><th>P</th></tr>
+    <tr>
+      <td><strong>乳幼児</strong></td>
+      <td>成長の遅れ・皮膚症状・貧血<br><span class="warn">（味覚障害は禁止）</span></td>
+      <td>血清亜鉛値、補充療法中</td>
+      <td>成長障害・皮膚炎・貧血の観点で問いかけ</td>
+      <td>「今回はみられないが経過観察」+ 次回亜鉛値確認</td>
+    </tr>
+    <tr>
+      <td><strong>小児・成人</strong></td>
+      <td>味覚障害の記載可</td>
+      <td>同上</td>
+      <td>味覚障害含む観点で評価可</td>
+      <td>同上</td>
+    </tr>
+  </table>
+</div>
+
+<!-- ===== 3. フラグ別ルール ===== -->
+<h2 id="flag">3. フラグ別ルール一覧</h2>
+<div class="card">
+
+  <h3>フラグ検出方法</h3>
+  <p><span class="code">#this-time</span> 内の innerText + <span class="code">.mark-div span</span> + <span class="code">.header-info span</span> のテキストを合わせて正規表現で判定。</p>
+
+  <table>
+    <tr><th>フラグ</th><th>正規表現</th><th>意味</th></tr>
+    <tr><td><strong>支B</strong></td><td><span class="flag-regex">/支\s*[BＢb]/</span></td><td>一包化</td></tr>
+    <tr><td><strong>薬B</strong></td><td><span class="flag-regex">/薬\s*[BＢb]/</span></td><td>お薬手帳未持参</td></tr>
+    <tr><td><strong>薬3A</strong></td><td><span class="flag-regex">/薬\s*[3３]\s*[AＡa]/</span></td><td>施設管理・情報交換あり</td></tr>
+    <tr><td><strong>薬3B</strong></td><td><span class="flag-regex">/薬\s*[3３]\s*[BＢb]/</span></td><td>施設管理・お薬手帳情報共有</td></tr>
+    <tr><td><strong>薬C</strong></td><td><span class="flag-regex">/薬\s*[CＣc]/</span></td><td>3ヶ月以上来局なし</td></tr>
+    <tr><td><strong>服Bハ</strong></td><td><span class="flag-regex">/服\s*[BＢb]\s*[ハはﾊ]/</span></td><td>服薬情報提供2（ケアマネ情報提供）</td></tr>
+  </table>
+
+  <hr>
+
+  <h3>支B（一包化）</h3>
+  <table>
+    <tr><th>モード</th><th>記載内容</th></tr>
+    <tr><td><span class="badge badge-soap">SOAP</span><span class="badge badge-oap">OAP</span></td><td>どこか適切な箇所に「一包化：心身の特性により適正な服用量を適正な服用時間に服用できないため一包化を行う」</td></tr>
+    <tr><td><span class="badge badge-a">A単独</span></td><td>Aに「一包化により服薬管理を支援している。」</td></tr>
+    <tr><td><span class="badge badge-off">OFF</span></td><td>一包化に関する記述は一切行わない</td></tr>
+  </table>
+
+  <h3>薬B（お薬手帳未持参）</h3>
+  <table>
+    <tr><th>モード</th><th>記載内容</th></tr>
+    <tr><td><span class="badge badge-soap">SOAP</span><span class="badge badge-oap">OAP</span></td><td>O：「お薬手帳の持参なし。」<br>P：「お薬手帳を持参することで、他院や他薬局との薬の重複・相互作用の確認ができるため、次回は持参するよう説明した。」</td></tr>
+    <tr><td><span class="badge badge-a">A単独</span></td><td>対象外（O/P向けルール）</td></tr>
+    <tr><td><span class="badge badge-off">OFF</span></td><td>お薬手帳未持参に関する記述は行わない</td></tr>
+  </table>
+
+  <h3>薬3A（施設管理・情報交換あり）</h3>
+  <table>
+    <tr><th>モード</th><th>記載内容</th></tr>
+    <tr><td><span class="badge badge-soap">SOAP</span><span class="badge badge-oap">OAP</span></td><td>O：「施設入所中。施設職員と情報交換を行った。」<br>P：「引き続き施設職員と連携し、服薬状況や体調変化について情報共有を行う。」</td></tr>
+    <tr><td><span class="badge badge-a">A単独</span></td><td>対象外</td></tr>
+    <tr><td><span class="badge badge-off">OFF</span></td><td>薬3Aに関する記述は行わない</td></tr>
+  </table>
+
+  <h3>薬3B（施設管理・お薬手帳情報共有）</h3>
+  <table>
+    <tr><th>モード</th><th>記載内容</th></tr>
+    <tr><td><span class="badge badge-soap">SOAP</span><span class="badge badge-oap">OAP</span></td><td>O：「施設入所中。」<br>P：「施設にお薬手帳の情報を共有し、服薬管理に役立てていただく。」</td></tr>
+    <tr><td><span class="badge badge-a">A単独</span></td><td>対象外</td></tr>
+    <tr><td><span class="badge badge-off">OFF</span></td><td>薬3Bに関する記述は行わない</td></tr>
+  </table>
+
+  <h3>薬C（3ヶ月以上来局なし）</h3>
+  <table>
+    <tr><th>モード</th><th>記載内容</th></tr>
+    <tr><td><span class="badge badge-soap">SOAP</span></td><td>過去に同じ薬があっても「定期処方の継続」とは扱わず初回投薬同様に。<br>S：現在の症状を記載（<span class="warn">「体調変わりない」禁止</span>）<br>O：「前回来局から3ヶ月以上経過。」<br>A：処方妥当性を改めて評価<br>P：次回確認事項として記載（<span class="warn">「今回はみられないが経過観察」ではなく</span>）</td></tr>
+    <tr><td><span class="badge badge-oap">OAP</span></td><td>同上（S除く）</td></tr>
+    <tr><td><span class="badge badge-a">A単独</span></td><td>処方妥当性を改めて評価</td></tr>
+    <tr><td><span class="badge badge-off">OFF</span></td><td>薬Cに関する特別な扱いは不要</td></tr>
+  </table>
+
+  <h3>服Bハ（ケアマネへの服薬情報提供）</h3>
+  <table>
+    <tr><th>モード</th><th>記載内容</th></tr>
+    <tr><td><span class="badge badge-soap">SOAP</span><span class="badge badge-oap">OAP</span></td><td>O：「服薬情報提供2：担当ケアマネジャーに対し、現在の内服状況について情報提供を行った。最新の薬剤情報を提供した。」<br>P：「引き続きケアマネジャーと連携し、服薬状況や処方変更があれば情報提供を行う。」</td></tr>
+    <tr><td><span class="badge badge-a">A単独</span></td><td>対象外</td></tr>
+    <tr><td><span class="badge badge-off">OFF</span></td><td>服Bハに関する記述は行わない</td></tr>
+  </table>
+</div>
+
+<!-- ===== 4. 禁止事項 ===== -->
+<h2 id="prohibit">4. 禁止事項（全モード共通）</h2>
+<div class="card">
+  <table>
+    <tr><th style="width:35%">禁止事項</th><th>詳細</th></tr>
+    <tr><td class="warn">「次回までに〜」</td><td>Aで使用禁止。問いかけはシンプルな疑問文で</td></tr>
+    <tr><td class="warn">「支B内服+2のため、」</td><td>この表現は使用禁止</td></tr>
+    <tr><td class="warn">「変更なし。」</td><td>「前回処方から変更なく継続」等の別表現を使う</td></tr>
+    <tr><td class="warn">新規作成時の「変わりない」</td><td>新規なので比較対象がない</td></tr>
+    <tr><td class="warn">初回投薬・追加処方時の「特に変わりない」</td><td>新しい薬が出る以上、何らかの症状がある</td></tr>
+    <tr><td class="warn">マークダウン記法</td><td>*、#、` 等は一切禁止。プレーンテキストで出力</td></tr>
+    <tr><td class="warn">日本語・英単語以外の言語</td><td>ロシア語、中国語、韓国語等は絶対に使用しない</td></tr>
+    <tr><td class="warn">「オンライン診療」「オンライン服薬指導」「オンライン」</td><td>当施設ではオンライン診療を行っていないため一切使用しない</td></tr>
+    <tr><td class="warn">Pでの「問題なかった」「問題ない」「問題なさそう」</td><td>「今回はみられない（が経過観察）」形式を使う</td></tr>
+  </table>
+</div>
+
+<!-- ===== 5. 重視項目 ===== -->
+<h2 id="focus">5. 重視項目（ユーザー設定）</h2>
+<div class="card">
+  <p>ポップアップ画面で選択可能。選択するとプロンプトに「■ 重視項目」セクションとして追加される。</p>
+
+  <h3>定型項目（チェックボックス）</h3>
+  <table>
+    <tr><th style="width:15%">項目</th><th>AIへの指示内容</th></tr>
+    <tr><td><strong>治療</strong></td><td>治療効果の評価・治療目標の達成度を重視。処方の妥当性や薬効の評価をAで重点的に記載し、Pで治療効果の確認事項を記載</td></tr>
+    <tr><td><strong>QOL</strong></td><td>患者のQOL（生活の質）を重視。日常生活への影響、睡眠・食欲・活動量などの変化をA/Pで評価・確認</td></tr>
+    <tr><td><strong>ADL</strong></td><td>患者のADL（日常生活動作）を重視。服薬管理能力、自立度、転倒リスクなどをA/Pで評価・確認</td></tr>
+    <tr><td><strong>腎機能</strong></td><td>腎機能への影響を重視。腎排泄型薬剤の用量調整の妥当性、eGFR/CcrなどをOに記載し、A/Pで評価・確認</td></tr>
+    <tr><td><strong>副作用</strong></td><td>副作用モニタリングを重視。処方薬の主な副作用を幅広くOで確認し、Aでリスク評価、Pで経過観察項目を充実</td></tr>
+  </table>
+
+  <h3>フリーコメント欄</h3>
+  <p>テキストエリアで自由記述可。プロンプトに「その他：{入力内容}」として追加される。</p>
+</div>
+
+<!-- ===== 6. ハイリスク薬 ===== -->
+<h2 id="highrisk">6. ハイリスク薬ルール</h2>
+<div class="card">
+  <p>処方内容に <span class="code">[H]</span> マークが付いている薬剤がある場合、メインセクションの下に追加セクションを出力する。</p>
+
+  <h3>出力フォーマット</h3>
+  <div style="background:#f1f3f4; padding:10px 14px; border-radius:4px; font-size:13px; margin:8px 0;">
+    ハイリスク薬<br>
+    - [薬剤名]：[注意項目のチェック内容を簡潔に記載]<br>
+    （複数あれば薬剤ごとに記載）
+  </div>
+
+  <h3>ルール</h3>
+  <ul>
+    <li>注意項目のチェックのみ記載（副作用詳細の確認チェックは不要）</li>
+    <li>患者の年齢・性別と矛盾する記載は行わない（例：高齢女性に「月経期間中の出血量に注意」は不適切）</li>
+    <li><span class="code">[H]</span> マークの薬剤がない場合はセクション自体を出力しない</li>
+  </ul>
+
+  <h3>対象薬剤の例</h3>
+  <p>DOAC、抗血小板薬、糖尿病用剤、精神神経用薬 など</p>
+</div>
+
+<!-- ===== 7. 過去データ ===== -->
+<h2 id="pastdata">7. 過去データの取り扱い</h2>
+<div class="card">
+  <h3>DOM要素からの取得</h3>
+  <table>
+    <tr><th>要素ID</th><th>ラベル</th><th>内容</th></tr>
+    <tr><td><span class="code">#last-time</span></td><td>【前回の来局データ】</td><td>直近の来局データ</td></tr>
+    <tr><td><span class="code">#two-times-before</span></td><td>【前々回の来局データ】</td><td>その前の来局データ</td></tr>
+    <tr><td><span class="code">#left</span>（フォールバック）</td><td>ラベルなし</td><td>上記要素がない場合に一括取得</td></tr>
+  </table>
+
+  <h3>フィルタリング</h3>
+  <p>過去データから支Bの記述行（<span class="flag-regex">/支\s*[BＢb]/</span> にマッチする行）を除外する</p>
+
+  <h3>AIへの指示</h3>
+  <div class="note">
+    過去データは【前回の来局データ】【前々回の来局データ】のラベルで区別されている。<br>
+    「前回の処方」「前回のP」等は必ず【前回の来局データ】を参照すること。<br>
+    <strong>前回と前々回を取り違えないこと。</strong>
+  </div>
+
+  <h3>定期処方の判定</h3>
+  <p>過去2回との医薬品の一致率が50%以上であれば「定期薬」と判断</p>
+</div>
+
+<!-- ===== 8. 整合性チェック ===== -->
+<h2 id="check">8. 整合性チェック一覧</h2>
+<div class="card">
+  <p>出力前にAIが必ず確認する項目。</p>
+
+  <h3>SOAP（26項目）</h3>
+  <table>
+    <tr><th style="width:30px">#</th><th>チェック内容</th></tr>
+    <tr><td>1</td><td>S/O/A/Pの内容が互いに矛盾していないか</td></tr>
+    <tr><td>2</td><td>初回投薬・追加処方がある場合、Sに「体調変わりない」等を書いていないか</td></tr>
+    <tr><td>3</td><td>Sで述べた症状がO/Aに適切に反映されているか</td></tr>
+    <tr><td>4</td><td>Aの問い・評価がPの計画に対応しているか</td></tr>
+    <tr><td>5</td><td>処方医薬品がSOAPの中で正しく言及されているか</td></tr>
+    <tr><td>6</td><td>一包化フラグ（支B）の指示通りに記載されているか</td></tr>
+    <tr><td>7</td><td>禁止事項に該当する表現が含まれていないか</td></tr>
+    <tr><td>8</td><td>日本語と英単語以外の言語が含まれていないか</td></tr>
+    <tr><td>9</td><td>マークダウン記法が含まれていないか</td></tr>
+    <tr><td>10</td><td>処方タイプに合った書き方になっているか</td></tr>
+    <tr><td>11</td><td>[H]マーク薬剤がある場合、ハイリスク薬セクションが出力されているか</td></tr>
+    <tr><td>12</td><td>ハイリスク薬の注意項目が年齢・性別と矛盾していないか</td></tr>
+    <tr><td>13</td><td>Aで薬剤妥当性を記載した場合、客観的情報がOに記載されているか</td></tr>
+    <tr><td>14</td><td>便秘薬が処方されているのに「便通は問題ない」と書いていないか</td></tr>
+    <tr><td>15</td><td>酢酸亜鉛＋乳幼児で「味覚障害」「味覚異常」を記載していないか</td></tr>
+    <tr><td>16</td><td>Oの「増量」「減量」が実際の用量変化と一致しているか</td></tr>
+    <tr><td>17</td><td>初回投薬・追加処方・用量変更でPに「問題なさそう」と書いていないか</td></tr>
+    <tr><td>18</td><td>お薬手帳フラグ（薬B）の指示通りに記載されているか</td></tr>
+    <tr><td>19</td><td>薬3Aフラグの指示通りに記載されているか</td></tr>
+    <tr><td>20</td><td>薬3Bフラグの指示通りに記載されているか</td></tr>
+    <tr><td>21</td><td>薬Cフラグがある場合、初回投薬同様の書き方になっているか</td></tr>
+    <tr><td>22</td><td>初回投薬・追加処方の薬について、Oで副作用確認を記載していないか</td></tr>
+    <tr><td>23</td><td>服Bハフラグの指示通りに記載されているか</td></tr>
+    <tr><td>24</td><td>「オンライン」表現が含まれていないか</td></tr>
+    <tr><td>25</td><td>過去データの前回・前々回を取り違えていないか</td></tr>
+    <tr><td>26</td><td>不整合があれば修正してから出力すること</td></tr>
+  </table>
+
+  <h3>OAP（25項目）</h3>
+  <table>
+    <tr><th style="width:30px">#</th><th>チェック内容</th></tr>
+    <tr><td>1</td><td>O/A/Pの内容が互いに矛盾していないか</td></tr>
+    <tr><td>2</td><td>Sが出力に含まれていないか（含まれていれば削除）</td></tr>
+    <tr><td>3</td><td>Aの問い・評価がPの計画に対応しているか</td></tr>
+    <tr><td>4</td><td>処方医薬品がOAPの中で正しく言及されているか</td></tr>
+    <tr><td>5</td><td>一包化フラグ（支B）の指示通りに記載されているか</td></tr>
+    <tr><td>6</td><td>禁止事項に該当する表現が含まれていないか</td></tr>
+    <tr><td>7</td><td>日本語と英単語以外の言語が含まれていないか</td></tr>
+    <tr><td>8</td><td>マークダウン記法が含まれていないか</td></tr>
+    <tr><td>9</td><td>処方タイプに合った書き方になっているか</td></tr>
+    <tr><td>10</td><td>[H]マーク薬剤がある場合、ハイリスク薬セクションが出力されているか</td></tr>
+    <tr><td>11</td><td>ハイリスク薬の注意項目が年齢・性別と矛盾していないか</td></tr>
+    <tr><td>12</td><td>Aで薬剤妥当性を記載した場合、客観的情報がOに記載されているか</td></tr>
+    <tr><td>13</td><td>便秘薬が処方されているのに「便通は問題ない」と書いていないか</td></tr>
+    <tr><td>14</td><td>酢酸亜鉛＋乳幼児で「味覚障害」「味覚異常」を記載していないか</td></tr>
+    <tr><td>15</td><td>Oの「増量」「減量」が実際の用量変化と一致しているか</td></tr>
+    <tr><td>16</td><td>初回投薬・追加処方・用量変更でPに「問題なさそう」と書いていないか</td></tr>
+    <tr><td>17</td><td>お薬手帳フラグ（薬B）の指示通りに記載されているか</td></tr>
+    <tr><td>18</td><td>薬3Aフラグの指示通りに記載されているか</td></tr>
+    <tr><td>19</td><td>薬3Bフラグの指示通りに記載されているか</td></tr>
+    <tr><td>20</td><td>薬Cフラグがある場合、初回投薬同様の書き方になっているか</td></tr>
+    <tr><td>21</td><td>初回投薬・追加処方の薬について、Oで副作用確認を記載していないか</td></tr>
+    <tr><td>22</td><td>服Bハフラグの指示通りに記載されているか</td></tr>
+    <tr><td>23</td><td>「オンライン」表現が含まれていないか</td></tr>
+    <tr><td>24</td><td>過去データの前回・前々回を取り違えていないか</td></tr>
+    <tr><td>25</td><td>不整合があれば修正してから出力すること</td></tr>
+  </table>
+
+  <h3>A単独（14項目）</h3>
+  <table>
+    <tr><th style="width:30px">#</th><th>チェック内容</th></tr>
+    <tr><td>1</td><td>Aの内容が処方内容と矛盾していないか</td></tr>
+    <tr><td>2</td><td>S、O、Pが出力に含まれていないか（含まれていれば削除）</td></tr>
+    <tr><td>3</td><td>処方医薬品がAの中で正しく言及されているか</td></tr>
+    <tr><td>4</td><td>禁止事項に該当する表現が含まれていないか</td></tr>
+    <tr><td>5</td><td>日本語と英単語以外の言語が含まれていないか</td></tr>
+    <tr><td>6</td><td>マークダウン記法が含まれていないか</td></tr>
+    <tr><td>7</td><td>処方タイプに合ったAの書き方になっているか</td></tr>
+    <tr><td>8</td><td>[H]マーク薬剤がある場合、ハイリスク薬セクションが出力されているか</td></tr>
+    <tr><td>9</td><td>ハイリスク薬の注意項目が年齢・性別と矛盾していないか</td></tr>
+    <tr><td>10</td><td>酢酸亜鉛＋乳幼児で「味覚障害」「味覚異常」を記載していないか</td></tr>
+    <tr><td>11</td><td>薬Cフラグがある場合、処方妥当性を改めて評価しているか</td></tr>
+    <tr><td>12</td><td>「オンライン」表現が含まれていないか</td></tr>
+    <tr><td>13</td><td>過去データの前回・前々回を取り違えていないか</td></tr>
+    <tr><td>14</td><td>不整合があれば修正してから出力すること</td></tr>
+  </table>
+</div>
+
+<!-- ===== 9. 申し送り ===== -->
+<h2 id="misc">9. 申し送り自動抽出</h2>
+<div class="card">
+  <p>SOAPモードの出力後、【P】セクションから「？」で終わる行を抽出し、<span class="code">#sent-matter-textarea</span>（申し送り事項欄）に自動入力する。</p>
+
+  <h3>対象</h3>
+  <ul>
+    <li>【P】または P（計画）セクション内の、末尾が「？」または「?」の行</li>
+  </ul>
+
+  <h3>動作</h3>
+  <ul>
+    <li>対象行が見つかった場合のみ書き込み</li>
+    <li>OAP / A単独モードでは【P】セクションがないため自動的にスキップされる</li>
+  </ul>
+</div>
+
+</div>
+</body>
+</html>

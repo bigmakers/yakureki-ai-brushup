@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "薬歴AIブラッシュアップ",
+  "name": "薬歴AIナビゲーション",
   "version": "1.0.0",
-  "description": "テキストエリアの薬歴内容を右クリックメニューからAIでブラッシュアップします",
+  "description": "テキストエリアの薬歴内容を右クリックメニューからAIでナビゲーションします",
   "permissions": ["contextMenus", "storage", "activeTab"],
   "background": {
     "service_worker": "background.js"

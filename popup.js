@@ -5,6 +5,8 @@ const modelToggle = document.getElementById("modelToggle");
 const modelHint = document.getElementById("modelHint");
 const apiLinkAnchor = document.getElementById("apiLinkAnchor");
 const providerBtns = document.querySelectorAll(".provider-btn");
+const focusChecks = document.querySelectorAll(".focus-check");
+const focusComment = document.getElementById("focusComment");
 
 // プロバイダーごとの設定
 const PROVIDERS = {
@@ -44,7 +46,7 @@ let selectedModel = "gemini-flash";
 let apiKeys = {};
 
 // 保存済みの設定を読み込み
-chrome.storage.sync.get(["aiProvider", "aiModel", "apiKeys"], (data) => {
+chrome.storage.sync.get(["aiProvider", "aiModel", "apiKeys", "focusItems", "focusComment"], (data) => {
   if (data.apiKeys) apiKeys = data.apiKeys;
   if (data.aiProvider) selectedProvider = data.aiProvider;
   if (data.aiModel) selectedModel = data.aiModel;
@@ -52,6 +54,17 @@ chrome.storage.sync.get(["aiProvider", "aiModel", "apiKeys"], (data) => {
   updateProviderUI();
   updateModelButtons();
   loadApiKey();
+
+  // 重視項目の復元
+  if (data.focusItems && Array.isArray(data.focusItems)) {
+    focusChecks.forEach(cb => {
+      cb.checked = data.focusItems.includes(cb.value);
+    });
+  }
+  // フリーコメントの復元
+  if (data.focusComment) {
+    focusComment.value = data.focusComment;
+  }
 
   if (apiKeys[selectedProvider]) {
     showStatus("設定済み", "success");
@@ -123,10 +136,18 @@ saveBtn.addEventListener("click", () => {
 
   apiKeys[selectedProvider] = key;
 
+  // 重視項目を収集
+  const focusItems = [];
+  focusChecks.forEach(cb => {
+    if (cb.checked) focusItems.push(cb.value);
+  });
+
   chrome.storage.sync.set({
     aiProvider: selectedProvider,
     aiModel: selectedModel,
-    apiKeys: apiKeys
+    apiKeys: apiKeys,
+    focusItems: focusItems,
+    focusComment: focusComment.value.trim()
   }, () => {
     const provName = selectedProvider === "gemini" ? "Gemini" : selectedProvider === "openai" ? "OpenAI" : "Claude";
     const current = PROVIDERS[selectedProvider].models.find(m => m.id === selectedModel);

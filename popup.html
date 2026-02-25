@@ -6,7 +6,7 @@
 </head>
 <body>
   <div class="container">
-    <h1>薬歴AIブラッシュアップ</h1>
+    <h1>薬歴AIナビゲーション</h1>
     <p class="description">AIプロバイダーとAPIキーを設定</p>
 
     <div class="form-group">
@@ -30,6 +30,19 @@
       <label>モデル</label>
       <div class="model-toggle" id="modelToggle"></div>
       <p class="model-hint" id="modelHint"></p>
+    </div>
+
+    <div class="form-group">
+      <label>重視項目（複数選択可）</label>
+      <div class="focus-items">
+        <label class="checkbox-label"><input type="checkbox" value="治療" class="focus-check"> 治療</label>
+        <label class="checkbox-label"><input type="checkbox" value="QOL" class="focus-check"> QOL</label>
+        <label class="checkbox-label"><input type="checkbox" value="ADL" class="focus-check"> ADL</label>
+        <label class="checkbox-label"><input type="checkbox" value="腎機能" class="focus-check"> 腎機能</label>
+        <label class="checkbox-label"><input type="checkbox" value="副作用" class="focus-check"> 副作用</label>
+      </div>
+      <textarea id="focusComment" placeholder="その他の指示やコメント（例：血圧の経過に注目、転倒リスクに注意 等）" rows="2"></textarea>
+      <p class="focus-hint">選択した項目を薬歴のA・Pで重点的に評価します</p>
     </div>
 
     <button id="saveBtn">保存</button>
