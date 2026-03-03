@@ -159,3 +159,42 @@ function showStatus(message, type) {
   statusEl.textContent = message;
   statusEl.className = "status " + type;
 }
+
+// プロンプト更新セクション
+const fetchPromptsBtn = document.getElementById("fetchPromptsBtn");
+const fetchStatusEl = document.getElementById("fetchStatus");
+const promptVersionEl = document.getElementById("promptVersion");
+const promptFetchedAtEl = document.getElementById("promptFetchedAt");
+
+// 保存済みのプロンプトメタ情報を表示
+chrome.runtime.sendMessage({ action: "getPromptMeta" }, (response) => {
+  if (response && response.meta) {
+    promptVersionEl.textContent = response.meta.version || "不明";
+    if (response.meta.fetchedAt) {
+      const d = new Date(response.meta.fetchedAt);
+      promptFetchedAtEl.textContent = d.toLocaleString("ja-JP");
+    }
+  }
+});
+
+fetchPromptsBtn.addEventListener("click", () => {
+  fetchPromptsBtn.disabled = true;
+  fetchPromptsBtn.textContent = "読み込み中...";
+  fetchStatusEl.textContent = "";
+  fetchStatusEl.className = "status";
+
+  chrome.runtime.sendMessage({ action: "fetchPrompts" }, (response) => {
+    fetchPromptsBtn.disabled = false;
+    fetchPromptsBtn.textContent = "最新のプロンプトを読み込む";
+
+    if (response && response.success) {
+      fetchStatusEl.textContent = "v" + response.meta.version + " を取得しました";
+      fetchStatusEl.className = "status success";
+      promptVersionEl.textContent = response.meta.version;
+      promptFetchedAtEl.textContent = new Date().toLocaleString("ja-JP");
+    } else {
+      fetchStatusEl.textContent = "取得失敗: " + (response?.error || "不明なエラー");
+      fetchStatusEl.className = "status error";
+    }
+  });
+});

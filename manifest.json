@@ -4,6 +4,9 @@
   "version": "1.0.0",
   "description": "テキストエリアの薬歴内容を右クリックメニューからAIでナビゲーションします",
   "permissions": ["contextMenus", "storage", "activeTab"],
+  "host_permissions": [
+    "https://raw.githubusercontent.com/bigmakers/yakureki-ai-brushup/*"
+  ],
   "background": {
     "service_worker": "background.js"
   },

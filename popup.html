@@ -47,6 +47,19 @@
 
     <button id="saveBtn">保存</button>
     <div id="status" class="status"></div>
+
+    <hr class="divider">
+
+    <div class="prompt-section">
+      <label>プロンプト更新</label>
+      <div class="prompt-meta" id="promptMeta">
+        <span class="meta-label">バージョン:</span> <span id="promptVersion">未取得</span>
+        <br>
+        <span class="meta-label">最終取得:</span> <span id="promptFetchedAt">-</span>
+      </div>
+      <button id="fetchPromptsBtn" class="fetch-btn">最新のプロンプトを読み込む</button>
+      <div id="fetchStatus" class="status"></div>
+    </div>
   </div>
   <script src="popup.js"></script>
 </body>

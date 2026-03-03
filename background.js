@@ -113,6 +113,108 @@ function buildFocusSection(focusItems, focusComment) {
   return section + "\n";
 }
 
+// GitHub からプロンプトテンプレートを取得する設定
+const PROMPT_BASE_URL = "https://raw.githubusercontent.com/bigmakers/yakureki-ai-brushup/main/prompts";
+
+// フラグ条件テキストを生成する
+function getFlagText(flagName, flagValue, context) {
+  switch (flagName) {
+    case "hasShiB":
+      if (context === "a-only") {
+        return `■ 一包化に関するルール（この判定は確定済みなので従うこと）：\n- 一包化: ${flagValue ? "該当する" : "該当しない"}\n${flagValue ? "- 一包化を行っている旨をAの中で適切に言及すること（例：「一包化により服薬管理を支援している。」）" : "- 一包化に関する記述は行わないこと"}`;
+      } else {
+        const modeLabel = context === "oap" ? "OAP" : "SOAP";
+        return `■ 一包化に関するルール（この判定は確定済みなので従うこと）：\n- 一包化: ${flagValue ? "記載する" : "記載しない"}\n${flagValue ? `- ${modeLabel}のどこか適切な箇所に必ず以下を記載すること：\n  「一包化：心身の特性により適正な服用量を適正な服用時間に服用できないため一包化を行う」` : "- 一包化に関する記述は一切行わないこと"}`;
+      }
+
+    case "hasYakuB":
+      if (context === "a-only") return "";
+      return `■ お薬手帳に関するルール（この判定は確定済みなので従うこと）：\n- お薬手帳持参なし: ${flagValue ? "記載する" : "記載しない"}\n${flagValue ? "- 今回の処方に薬Bフラグがあるため、お薬手帳の持参がなかったと判断する\n- Oに「お薬手帳の持参なし。」と記載すること\n- Pに「お薬手帳を持参することで、他院や他薬局との薬の重複・相互作用の確認ができるため、次回は持参するよう説明した。」と記載すること" : "- お薬手帳未持参に関する記述は行わないこと"}`;
+
+    case "hasYaku3A":
+      if (context === "a-only") return "";
+      return `■ 施設管理に関するルール（この判定は確定済みなので従うこと）：\n- 薬3Aフラグ（施設管理・情報交換あり）: ${flagValue ? "該当する" : "該当しない"}\n${flagValue ? "- 今回の処方に薬3Aフラグがあるため、施設管理の患者と判断する\n- Oに「施設入所中。施設職員と情報交換を行った。」と記載すること\n- Pに「引き続き施設職員と連携し、服薬状況や体調変化について情報共有を行う。」と記載すること" : "- 薬3Aに関する記述は行わないこと"}`;
+
+    case "hasYaku3B":
+      if (context === "a-only") return "";
+      return `- 薬3Bフラグ（施設管理・お薬手帳情報共有）: ${flagValue ? "該当する" : "該当しない"}\n${flagValue ? "- 今回の処方に薬3Bフラグがあるため、施設管理の患者でお薬手帳情報の共有が必要と判断する\n- Oに「施設入所中。」と記載すること\n- Pに「施設にお薬手帳の情報を共有し、服薬管理に役立てていただく。」と記載すること" : "- 薬3Bに関する記述は行わないこと"}`;
+
+    case "hasYakuC":
+      if (context === "a-only") {
+        return `■ 3ヶ月以上来局なし（薬C）に関するルール（この判定は確定済みなので従うこと）：\n- 薬Cフラグ: ${flagValue ? "該当する" : "該当しない"}\n${flagValue ? "- 今回の処方に薬Cフラグがあるため、前回来局から3ヶ月以上経過していると判断する\n- たとえ過去データに同じ薬があっても「定期処方の継続」とは扱わず、Aでは処方妥当性を改めて評価すること" : "- 薬Cに関する特別な扱いは不要"}`;
+      }
+      if (context === "oap") {
+        return `■ 3ヶ月以上来局なし（薬C）に関するルール（この判定は確定済みなので従うこと）：\n- 薬Cフラグ: ${flagValue ? "該当する" : "該当しない"}\n${flagValue ? "- 今回の処方に薬Cフラグがあるため、前回来局から3ヶ月以上経過していると判断する\n- たとえ過去データに同じ薬があっても「定期処方の継続」とは扱わず、初回投薬（新規処方）と同様の書き方をすること\n- Oには前回来局から期間が空いている旨を記載すること（例：「前回来局から3ヶ月以上経過。」）\n- Aには処方妥当性を改めて評価すること\n- Pには初回投薬と同様に次回確認事項として記載すること（「今回はみられないが経過観察」ではなく、副作用や効果の確認を次回確認する形式）" : "- 薬Cに関する特別な扱いは不要"}`;
+      }
+      // soap
+      return `■ 3ヶ月以上来局なし（薬C）に関するルール（この判定は確定済みなので従うこと）：\n- 薬Cフラグ: ${flagValue ? "該当する" : "該当しない"}\n${flagValue ? "- 今回の処方に薬Cフラグがあるため、前回来局から3ヶ月以上経過していると判断する\n- たとえ過去データに同じ薬があっても「定期処方の継続」とは扱わず、初回投薬（新規処方）と同様の書き方をすること\n- Sには「体調変わりない」「特に変わりない」ではなく、現在の症状や状態を記載すること\n- Oには前回来局から期間が空いている旨を記載すること（例：「前回来局から3ヶ月以上経過。」）\n- Aには処方妥当性を改めて評価すること\n- Pには初回投薬と同様に次回確認事項として記載すること（「今回はみられないが経過観察」ではなく、副作用や効果の確認を次回確認する形式）" : "- 薬Cに関する特別な扱いは不要"}`;
+
+    case "hasFukuBHa":
+      if (context === "a-only") return "";
+      return `■ 服薬情報提供（服Bハ）に関するルール（この判定は確定済みなので従うこと）：\n- 服Bハフラグ（服薬情報提供2・ケアマネへの情報提供）: ${flagValue ? "該当する" : "該当しない"}\n${flagValue ? "- 今回の処方に服Bハフラグがあるため、ケアマネジャーへの服薬情報提供を行ったと判断する\n- Oに「服薬情報提供2：担当ケアマネジャーに対し、現在の内服状況について情報提供を行った。最新の薬剤情報を提供した。」と記載すること\n- Pに「引き続きケアマネジャーと連携し、服薬状況や処方変更があれば情報提供を行う。」と記載すること" : "- 服Bハに関する記述は行わないこと"}`;
+
+    default:
+      return "";
+  }
+}
+
+// テンプレートのプレースホルダーを展開する
+function processTemplate(template, context, variables) {
+  let result = template;
+
+  // データプレースホルダー置換
+  result = result.replace("{{PRESCRIPTION_SECTION}}", variables.prescriptionSection || "");
+  result = result.replace("{{PAST_DATA_SECTION}}", variables.pastDataSection || "");
+  result = result.replace("{{FOCUS_SECTION}}", variables.focusSection || "");
+  result = result.replace("{{TEXT}}", variables.text || "");
+
+  // フラグプレースホルダー置換
+  const flags = ["hasShiB", "hasYakuB", "hasYaku3A", "hasYaku3B", "hasYakuC", "hasFukuBHa"];
+  for (const flag of flags) {
+    const placeholder = `{{FLAG:${flag}}}`;
+    if (result.includes(placeholder)) {
+      result = result.replace(placeholder, getFlagText(flag, variables[flag], context));
+    }
+  }
+
+  // 未解決プレースホルダーチェック（あればフォールバック）
+  if (/\{\{[^}]+\}\}/.test(result)) {
+    console.warn("[薬歴AI] テンプレートに未解決プレースホルダーあり、フォールバックします");
+    return null;
+  }
+
+  return result;
+}
+
+// GitHub からプロンプトテンプレートを取得してキャッシュする
+async function fetchPromptTemplates() {
+  const metaRes = await fetch(`${PROMPT_BASE_URL}/meta.json`, { cache: "no-store" });
+  if (!metaRes.ok) throw new Error(`meta.json取得失敗 (${metaRes.status})`);
+  const meta = await metaRes.json();
+
+  const [soap, oap, aOnly] = await Promise.all([
+    fetch(`${PROMPT_BASE_URL}/soap.txt`, { cache: "no-store" }).then(r => {
+      if (!r.ok) throw new Error(`soap.txt取得失敗 (${r.status})`);
+      return r.text();
+    }),
+    fetch(`${PROMPT_BASE_URL}/oap.txt`, { cache: "no-store" }).then(r => {
+      if (!r.ok) throw new Error(`oap.txt取得失敗 (${r.status})`);
+      return r.text();
+    }),
+    fetch(`${PROMPT_BASE_URL}/a-only.txt`, { cache: "no-store" }).then(r => {
+      if (!r.ok) throw new Error(`a-only.txt取得失敗 (${r.status})`);
+      return r.text();
+    })
+  ]);
+
+  await chrome.storage.local.set({
+    cachedPrompts: { soap, oap, "a-only": aOnly },
+    promptMeta: { ...meta, fetchedAt: new Date().toISOString() }
+  });
+
+  return meta;
+}
+
 function buildPrompt(text, prescription, pastData, hasShiB, hasYakuB, hasYaku3A, hasYaku3B, hasYakuC, hasFukuBHa, focusItems, focusComment) {
   let prescriptionSection = "";
   if (prescription) {
@@ -709,13 +811,47 @@ ${text}`;
 
 // AI呼び出しの振り分け
 async function callAI(provider, model, apiKey, text, prescription, pastData, hasShiB, hasYakuB, hasYaku3A, hasYaku3B, hasYakuC, hasFukuBHa, focusItems, focusComment, mode) {
-  let prompt;
-  if (mode === "a-only") {
-    prompt = buildAOnlyPrompt(text, prescription, pastData, hasShiB, hasYakuB, hasYaku3A, hasYaku3B, hasYakuC, hasFukuBHa, focusItems, focusComment);
-  } else if (mode === "oap") {
-    prompt = buildOAPPrompt(text, prescription, pastData, hasShiB, hasYakuB, hasYaku3A, hasYaku3B, hasYakuC, hasFukuBHa, focusItems, focusComment);
-  } else {
-    prompt = buildPrompt(text, prescription, pastData, hasShiB, hasYakuB, hasYaku3A, hasYaku3B, hasYakuC, hasFukuBHa, focusItems, focusComment);
+  let prompt = null;
+
+  // キャッシュされたテンプレートを優先
+  try {
+    const { cachedPrompts } = await chrome.storage.local.get(["cachedPrompts"]);
+    if (cachedPrompts && cachedPrompts[mode]) {
+      let prescriptionSection = "";
+      if (prescription) {
+        prescriptionSection = `\n■ 今回の処方内容：\n${prescription}\n\n`;
+      }
+      let pastDataSection = "";
+      if (pastData) {
+        const note = mode === "soap"
+          ? "※ 重要：過去データは【前回の来局データ】【前々回の来局データ】のラベルで区別されている。「前回」と「前々回」を取り違えないこと。「前回の処方」「前回のP」等と言う場合は、必ず【前回の来局データ】を参照すること。"
+          : "※ 重要：過去データは【前回の来局データ】【前々回の来局データ】のラベルで区別されている。「前回」と「前々回」を取り違えないこと。「前回の処方」等と言う場合は、必ず【前回の来局データ】を参照すること。";
+        pastDataSection = `\n■ 過去の処方・薬歴データ（#left から取得）：\n${note}\n${pastData}\n\n`;
+      }
+      const focusSection = buildFocusSection(focusItems, focusComment);
+      const variables = {
+        prescriptionSection, pastDataSection, focusSection, text,
+        hasShiB, hasYakuB, hasYaku3A, hasYaku3B, hasYakuC, hasFukuBHa
+      };
+      prompt = processTemplate(cachedPrompts[mode], mode, variables);
+      if (prompt) {
+        console.log("[薬歴AI] リモートテンプレートを使用:", mode);
+      }
+    }
+  } catch (e) {
+    console.warn("[薬歴AI] テンプレートキャッシュ読み込みエラー、フォールバックします:", e);
+  }
+
+  // フォールバック：既存のハードコード関数を使用
+  if (!prompt) {
+    console.log("[薬歴AI] ハードコードプロンプトを使用:", mode);
+    if (mode === "a-only") {
+      prompt = buildAOnlyPrompt(text, prescription, pastData, hasShiB, hasYakuB, hasYaku3A, hasYaku3B, hasYakuC, hasFukuBHa, focusItems, focusComment);
+    } else if (mode === "oap") {
+      prompt = buildOAPPrompt(text, prescription, pastData, hasShiB, hasYakuB, hasYaku3A, hasYaku3B, hasYakuC, hasFukuBHa, focusItems, focusComment);
+    } else {
+      prompt = buildPrompt(text, prescription, pastData, hasShiB, hasYakuB, hasYaku3A, hasYaku3B, hasYakuC, hasFukuBHa, focusItems, focusComment);
+    }
   }
 
   switch (provider) {
@@ -813,3 +949,19 @@ async function callClaude(apiKey, prompt, model) {
   if (!resultText) throw new Error("Claudeから有効な応答が得られませんでした");
   return resultText.trim();
 }
+
+// popup.js からのメッセージを処理
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.action === "fetchPrompts") {
+    fetchPromptTemplates()
+      .then(meta => sendResponse({ success: true, meta }))
+      .catch(err => sendResponse({ success: false, error: err.message }));
+    return true; // 非同期応答
+  }
+  if (message.action === "getPromptMeta") {
+    chrome.storage.local.get(["promptMeta"], (data) => {
+      sendResponse({ meta: data.promptMeta || null });
+    });
+    return true;
+  }
+});
