@@ -128,9 +128,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     case "setTextareaValue":
       if (lastRightClickedElement) {
-        // OAP・A単独モードの場合は既存テキストに追記する
+        // OAP・A単独・SBARモードの場合は既存テキストに追記する
         let finalValue = message.value;
-        if (message.mode === "a-only" || message.mode === "oap") {
+        if (message.mode === "a-only" || message.mode === "oap" || message.mode === "sbar") {
           const currentValue = lastRightClickedElement.isContentEditable
             ? lastRightClickedElement.innerText
             : lastRightClickedElement.value;
@@ -163,12 +163,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         // Pセクションから「？」で終わる行を抽出して #sent-matter-textarea にペースト
         try {
           const outputText = message.value;
-          // P（計画）セクションを抽出（Pから次のセクションやハイリスク薬、または末尾まで）
-          const pMatch = outputText.match(/(?:【P】|P[（(]計画[）)])\s*\n([\s\S]*?)(?=\n(?:ハイリスク薬|【[SOA]】|S[（(]|O[（(]|A[（(])|\s*$)/);
+          // P（計画）セクションまたはR（提案）セクションを抽出
+          const pMatch = outputText.match(/(?:【P】|P[（(]計画[）)])\s*\n([\s\S]*?)(?=\n(?:ハイリスク薬|【[SOAB]】|S[（(]|O[（(]|A[（(])|\s*$)/);
+          const rMatch = outputText.match(/(?:【R】|R[（(]提案[）)])\s*\n([\s\S]*?)(?=\n(?:ハイリスク薬|【[SBA]】|S[（(]|B[（(]|A[（(])|\s*$)/);
           let questionLines = [];
-          if (pMatch) {
-            const pContent = pMatch[1];
-            questionLines = pContent.split("\n")
+          const sectionContent = pMatch ? pMatch[1] : (rMatch ? rMatch[1] : null);
+          if (sectionContent) {
+            questionLines = sectionContent.split("\n")
               .map(line => line.replace(/^[-・\s]+/, "").trim())
               .filter(line => line.endsWith("？") || line.endsWith("?"));
           }

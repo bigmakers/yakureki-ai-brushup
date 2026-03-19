@@ -15,6 +15,29 @@ chrome.runtime.onInstalled.addListener(() => {
     title: "薬歴をAIでナビゲーション（A）",
     contexts: ["editable"]
   });
+  chrome.contextMenus.create({
+    id: "brushup-yakureki-sbar",
+    title: "薬歴をAIでナビゲーション（SBAR）",
+    contexts: ["editable"]
+  });
+
+  // Ollama向け: Originヘッダーを除去して403を回避
+  chrome.declarativeNetRequest.updateDynamicRules({
+    removeRuleIds: [1],
+    addRules: [{
+      id: 1,
+      priority: 1,
+      action: {
+        type: "modifyHeaders",
+        requestHeaders: [{ header: "Origin", operation: "remove" }]
+      },
+      condition: {
+        urlFilter: "http://*",
+        initiatorDomains: [chrome.runtime.id],
+        resourceTypes: ["xmlhttprequest"]
+      }
+    }]
+  });
 });
 
 // コンテキストメニュークリック時の処理
@@ -22,9 +45,10 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   const isSOAP = info.menuItemId === "brushup-yakureki";
   const isOAP = info.menuItemId === "brushup-yakureki-oap";
   const isAOnly = info.menuItemId === "brushup-yakureki-a";
-  if (!isSOAP && !isOAP && !isAOnly) return;
+  const isSBAR = info.menuItemId === "brushup-yakureki-sbar";
+  if (!isSOAP && !isOAP && !isAOnly && !isSBAR) return;
 
-  const mode = isAOnly ? "a-only" : (isOAP ? "oap" : "soap");
+  const mode = isSBAR ? "sbar" : (isAOnly ? "a-only" : (isOAP ? "oap" : "soap"));
 
   try {
     // content.jsからテキストエリアの内容を取得
@@ -120,7 +144,9 @@ const PROMPT_BASE_URL = "https://raw.githubusercontent.com/bigmakers/yakureki-ai
 function getFlagText(flagName, flagValue, context) {
   switch (flagName) {
     case "hasShiB":
-      if (context === "a-only") {
+      if (context === "sbar") {
+        return flagValue ? "■ 一包化に関する情報：\n- 一包化が行われている患者である。必要に応じてSBARの中で言及すること。" : "";
+      } else if (context === "a-only") {
         return `■ 一包化に関するルール（この判定は確定済みなので従うこと）：\n- 一包化: ${flagValue ? "該当する" : "該当しない"}\n${flagValue ? "- 一包化を行っている旨をAの中で適切に言及すること（例：「一包化により服薬管理を支援している。」）" : "- 一包化に関する記述は行わないこと"}`;
       } else {
         const modeLabel = context === "oap" ? "OAP" : "SOAP";
@@ -129,17 +155,29 @@ function getFlagText(flagName, flagValue, context) {
 
     case "hasYakuB":
       if (context === "a-only") return "";
+      if (context === "sbar") {
+        return flagValue ? "■ お薬手帳に関する情報：\n- お薬手帳の持参がなかった。必要に応じて医師への情報共有としてSBARの中で言及すること。" : "";
+      }
       return `■ お薬手帳に関するルール（この判定は確定済みなので従うこと）：\n- お薬手帳持参なし: ${flagValue ? "記載する" : "記載しない"}\n${flagValue ? "- 今回の処方に薬Bフラグがあるため、お薬手帳の持参がなかったと判断する\n- Oに「お薬手帳の持参なし。」と記載すること\n- Pに「お薬手帳を持参することで、他院や他薬局との薬の重複・相互作用の確認ができるため、次回は持参するよう説明した。」と記載すること" : "- お薬手帳未持参に関する記述は行わないこと"}`;
 
     case "hasYaku3A":
       if (context === "a-only") return "";
+      if (context === "sbar") {
+        return flagValue ? "■ 施設管理に関する情報：\n- 施設入所中の患者で、施設職員と情報交換を行った。必要に応じてSBARの中で言及すること。" : "";
+      }
       return `■ 施設管理に関するルール（この判定は確定済みなので従うこと）：\n- 薬3Aフラグ（施設管理・情報交換あり）: ${flagValue ? "該当する" : "該当しない"}\n${flagValue ? "- 今回の処方に薬3Aフラグがあるため、施設管理の患者と判断する\n- Oに「施設入所中。施設職員と情報交換を行った。」と記載すること\n- Pに「引き続き施設職員と連携し、服薬状況や体調変化について情報共有を行う。」と記載すること" : "- 薬3Aに関する記述は行わないこと"}`;
 
     case "hasYaku3B":
       if (context === "a-only") return "";
+      if (context === "sbar") {
+        return flagValue ? "■ 施設管理に関する情報：\n- 施設入所中の患者で、お薬手帳情報の共有が必要。必要に応じてSBARの中で言及すること。" : "";
+      }
       return `- 薬3Bフラグ（施設管理・お薬手帳情報共有）: ${flagValue ? "該当する" : "該当しない"}\n${flagValue ? "- 今回の処方に薬3Bフラグがあるため、施設管理の患者でお薬手帳情報の共有が必要と判断する\n- Oに「施設入所中。」と記載すること\n- Pに「施設にお薬手帳の情報を共有し、服薬管理に役立てていただく。」と記載すること" : "- 薬3Bに関する記述は行わないこと"}`;
 
     case "hasYakuC":
+      if (context === "sbar") {
+        return flagValue ? "■ 3ヶ月以上来局なし（薬C）に関する情報：\n- 前回来局から3ヶ月以上経過している。久しぶりの来局である点をSBARの背景情報に含めること。" : "";
+      }
       if (context === "a-only") {
         return `■ 3ヶ月以上来局なし（薬C）に関するルール（この判定は確定済みなので従うこと）：\n- 薬Cフラグ: ${flagValue ? "該当する" : "該当しない"}\n${flagValue ? "- 今回の処方に薬Cフラグがあるため、前回来局から3ヶ月以上経過していると判断する\n- たとえ過去データに同じ薬があっても「定期処方の継続」とは扱わず、Aでは処方妥当性を改めて評価すること" : "- 薬Cに関する特別な扱いは不要"}`;
       }
@@ -151,6 +189,9 @@ function getFlagText(flagName, flagValue, context) {
 
     case "hasFukuBHa":
       if (context === "a-only") return "";
+      if (context === "sbar") {
+        return flagValue ? "■ 服薬情報提供（服Bハ）に関する情報：\n- ケアマネジャーへの服薬情報提供を行った。必要に応じてSBARの中で言及すること。" : "";
+      }
       return `■ 服薬情報提供（服Bハ）に関するルール（この判定は確定済みなので従うこと）：\n- 服Bハフラグ（服薬情報提供2・ケアマネへの情報提供）: ${flagValue ? "該当する" : "該当しない"}\n${flagValue ? "- 今回の処方に服Bハフラグがあるため、ケアマネジャーへの服薬情報提供を行ったと判断する\n- Oに「服薬情報提供2：担当ケアマネジャーに対し、現在の内服状況について情報提供を行った。最新の薬剤情報を提供した。」と記載すること\n- Pに「引き続きケアマネジャーと連携し、服薬状況や処方変更があれば情報提供を行う。」と記載すること" : "- 服Bハに関する記述は行わないこと"}`;
 
     default:
@@ -192,7 +233,7 @@ async function fetchPromptTemplates() {
   if (!metaRes.ok) throw new Error(`meta.json取得失敗 (${metaRes.status})`);
   const meta = await metaRes.json();
 
-  const [soap, oap, aOnly] = await Promise.all([
+  const [soap, oap, aOnly, sbar] = await Promise.all([
     fetch(`${PROMPT_BASE_URL}/soap.txt`, { cache: "no-store" }).then(r => {
       if (!r.ok) throw new Error(`soap.txt取得失敗 (${r.status})`);
       return r.text();
@@ -204,11 +245,21 @@ async function fetchPromptTemplates() {
     fetch(`${PROMPT_BASE_URL}/a-only.txt`, { cache: "no-store" }).then(r => {
       if (!r.ok) throw new Error(`a-only.txt取得失敗 (${r.status})`);
       return r.text();
-    })
+    }),
+    fetch(`${PROMPT_BASE_URL}/sbar.txt`, { cache: "no-store" }).then(r => {
+      if (!r.ok) {
+        console.warn("[薬歴AI] sbar.txt取得失敗、ハードコードを使用します");
+        return null;
+      }
+      return r.text();
+    }).catch(() => null)
   ]);
 
+  const cachedPrompts = { soap, oap, "a-only": aOnly };
+  if (sbar) cachedPrompts.sbar = sbar;
+
   await chrome.storage.local.set({
-    cachedPrompts: { soap, oap, "a-only": aOnly },
+    cachedPrompts,
     promptMeta: { ...meta, fetchedAt: new Date().toISOString() }
   });
 
@@ -809,6 +860,132 @@ ${focusSection}■ 注意事項：
 ${text}`;
 }
 
+// SBAR モード用プロンプトを組み立てる（薬剤師→医師への報告）
+function buildSBARPrompt(text, prescription, pastData, hasShiB, hasYakuB, hasYaku3A, hasYaku3B, hasYakuC, hasFukuBHa, focusItems, focusComment) {
+  let prescriptionSection = "";
+  if (prescription) {
+    prescriptionSection = `
+■ 今回の処方内容：
+${prescription}
+
+`;
+  }
+
+  let pastDataSection = "";
+  if (pastData) {
+    pastDataSection = `
+■ 過去の処方・薬歴データ（#left から取得）：
+※ 重要：過去データは【前回の来局データ】【前々回の来局データ】のラベルで区別されている。「前回」と「前々回」を取り違えないこと。「前回の処方」等と言う場合は、必ず【前回の来局データ】を参照すること。
+${pastData}
+
+`;
+  }
+
+  const focusSection = buildFocusSection(focusItems, focusComment);
+
+  return `あなたは薬剤師向けのSBAR（状況報告）作成ナビゲーションアシスタントです。
+以下の薬歴内容、今回の処方内容、過去データを元に、薬剤師から医師への報告・提案をSBAR形式で作成してください。
+SBARは疑義照会、処方提案、情報共有など、医師へのコミュニケーションに使用します。
+薬歴内容が空の場合は、処方内容を元にSBARを新規作成してください。
+${prescriptionSection}${pastDataSection}■ まず処方内容を分析し、医師に報告・提案すべき事項を特定すること。
+以下の観点から報告事項を検討する：
+- 処方内容に薬学的な問題点（相互作用、用量、重複等）がないか
+- 患者の状態変化に伴う処方変更の提案が必要か
+- 副作用の発現や懸念事項の報告が必要か
+- 検査値に基づく用量調整の提案が必要か
+- その他、医師と共有すべき情報があるか
+
+=== SBAR形式の書き方 ===
+
+【S】状況（Situation）
+- 患者の現在の状況を簡潔に報告する
+- 何について報告・相談したいのかを明確にする
+- 処方内容の概要を記載する
+  （例：「○○様の処方について確認したい事項があります。」）
+  （例：「○○の処方に関して、薬学的観点から提案があります。」）
+
+【B】背景（Background）
+- 報告に関連する背景情報を記載する
+- 過去の処方歴、薬歴、検査値の経過など
+- 処方変更があった場合はその経緯
+- 患者の既往歴や併用薬で関連するもの
+  （例：「前回の処方では○○が処方されていましたが、今回○○に変更されています。」）
+  （例：「過去のデータでは○○の副作用歴があります。」）
+
+【A】アセスメント（Assessment）
+- 薬剤師としての薬学的評価を記載する
+- 問題点や懸念事項を具体的に記載する
+- エビデンスや根拠に基づいた評価を行う
+  （例：「○○と○○の併用により、○○のリスクが上昇する可能性があります。」）
+  （例：「腎機能を考慮すると、○○の用量が過量である可能性があります。」）
+
+【R】提案（Recommendation）
+- 医師への具体的な提案・依頼を記載する
+- 代替案がある場合は具体的に提示する
+- 確認事項がある場合は明確に記載する
+  （例：「○○への変更、または○○の用量調整をご検討いただけますでしょうか。」）
+  （例：「○○の血中濃度モニタリングの実施をご検討ください。」）
+
+=== 報告すべき事項が特にない場合 ===
+処方内容に特段の問題がなく、疑義照会や提案が不要と判断される場合でも、以下の観点でSBARを作成する：
+- S: 処方内容の確認結果を報告する旨を記載
+- B: 処方内容と患者背景の要約
+- A: 処方の妥当性が確認できた旨を記載（どの観点で確認したか具体的に）
+- R: 現行処方の継続で問題ない旨、および今後注意すべき点があれば記載
+
+${hasShiB ? "■ 一包化に関する情報：\n- 一包化が行われている患者である。必要に応じてSBARの中で言及すること。\n" : ""}
+${hasYakuB ? "■ お薬手帳に関する情報：\n- お薬手帳の持参がなかった。必要に応じて医師への情報共有としてSBARの中で言及すること。\n" : ""}
+${hasYaku3A ? "■ 施設管理に関する情報：\n- 施設入所中の患者で、施設職員と情報交換を行った。必要に応じてSBARの中で言及すること。\n" : ""}
+${hasYaku3B ? "■ 施設管理に関する情報：\n- 施設入所中の患者で、お薬手帳情報の共有が必要。必要に応じてSBARの中で言及すること。\n" : ""}
+${hasYakuC ? "■ 3ヶ月以上来局なし（薬C）に関する情報：\n- 前回来局から3ヶ月以上経過している。久しぶりの来局である点をSBARの背景情報に含めること。\n" : ""}
+${hasFukuBHa ? "■ 服薬情報提供（服Bハ）に関する情報：\n- ケアマネジャーへの服薬情報提供を行った。必要に応じてSBARの中で言及すること。\n" : ""}
+${focusSection}■ 注意事項：
+- 処方内容に含まれる医薬品名を把握し、SBARの内容に反映すること
+- 誤字脱字を修正すること
+- 医療・薬学の専門用語を適正に使用すること
+- 文章は簡潔かつ明確にすること
+- 医師への報告文として適切な丁寧語を使用すること
+- 改善したSBARのみを出力すること。説明や補足は不要です。
+
+■ 禁止事項（以下は絶対に守ること）：
+- 「支B内服+2のため、」という表現は使用しない
+- アスタリスク(*)、シャープ(#)、バッククォート(\`)などのマークダウン記法は一切使用しないこと。プレーンテキストで出力すること。
+- 出力は日本語と英単語（医薬品名等）のみとすること。ロシア語、中国語、韓国語、その他の言語は絶対に使用しないこと。
+- 「オンライン診療」「オンライン服薬指導」「オンライン」という表現は一切使用しないこと。当施設ではオンライン診療は行っていない。
+
+■ ハイリスク薬について：
+処方内容に[H]マークが付いている薬剤（DOAC、抗血小板薬、糖尿病用剤、精神神経用薬など）がある場合、SBARの下に以下のセクションを追加する。
+
+---出力フォーマット---
+（SBARの後に改行して）
+
+ハイリスク薬
+- [該当する薬剤名]：[注意項目のチェック内容を簡潔に記載]
+（複数あれば薬剤ごとに記載）
+
+---ルール---
+- 注意項目のチェックのみ記載する（副作用詳細の確認チェックは不要）
+- 患者の年齢・性別が推測できる場合、それと矛盾する記載は行わないこと
+- [H]マークの薬剤がない場合は、このセクション自体を出力しない
+
+■ 最終整合性チェック（出力前に必ず以下を確認すること）：
+1. S/B/A/Rの内容が互いに矛盾していないか確認する
+2. 処方内容に記載された医薬品がSBARの中で正しく言及されているか確認する
+3. 禁止事項に該当する表現が含まれていないか確認する
+4. 日本語と英単語以外の言語が含まれていないか確認する
+5. マークダウン記法が含まれていないか確認する
+6. [H]マークの薬剤がある場合、ハイリスク薬セクションが出力されているか確認する
+7. ハイリスク薬の注意項目が患者の年齢・性別と矛盾していないか確認する
+8. 医師への報告として適切な丁寧語・敬語が使われているか確認する
+9. 提案（R）が具体的で実行可能な内容になっているか確認する
+10. 「オンライン診療」「オンライン服薬指導」「オンライン」という表現が含まれていないか確認する
+11. 過去データを参照する際、「前回」と「前々回」を取り違えていないか確認する
+12. 不整合があれば修正してから出力すること
+
+薬歴内容：
+${text}`;
+}
+
 // AI呼び出しの振り分け
 async function callAI(provider, model, apiKey, text, prescription, pastData, hasShiB, hasYakuB, hasYaku3A, hasYaku3B, hasYakuC, hasFukuBHa, focusItems, focusComment, mode) {
   let prompt = null;
@@ -849,6 +1026,8 @@ async function callAI(provider, model, apiKey, text, prescription, pastData, has
       prompt = buildAOnlyPrompt(text, prescription, pastData, hasShiB, hasYakuB, hasYaku3A, hasYaku3B, hasYakuC, hasFukuBHa, focusItems, focusComment);
     } else if (mode === "oap") {
       prompt = buildOAPPrompt(text, prescription, pastData, hasShiB, hasYakuB, hasYaku3A, hasYaku3B, hasYakuC, hasFukuBHa, focusItems, focusComment);
+    } else if (mode === "sbar") {
+      prompt = buildSBARPrompt(text, prescription, pastData, hasShiB, hasYakuB, hasYaku3A, hasYaku3B, hasYakuC, hasFukuBHa, focusItems, focusComment);
     } else {
       prompt = buildPrompt(text, prescription, pastData, hasShiB, hasYakuB, hasYaku3A, hasYaku3B, hasYakuC, hasFukuBHa, focusItems, focusComment);
     }
@@ -861,6 +1040,8 @@ async function callAI(provider, model, apiKey, text, prescription, pastData, has
       return await callOpenAI(apiKey, prompt, model);
     case "claude":
       return await callClaude(apiKey, prompt, model);
+    case "ollama":
+      return await callOllama(apiKey, prompt, model);
     default:
       throw new Error("不明なプロバイダー: " + provider);
   }
@@ -950,6 +1131,32 @@ async function callClaude(apiKey, prompt, model) {
   return resultText.trim();
 }
 
+// Ollama API（OpenAI互換）
+async function callOllama(baseUrl, prompt, model) {
+  const url = baseUrl.replace(/\/+$/, "") + "/v1/chat/completions";
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: model,
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.3,
+      stream: false
+    })
+  });
+
+  if (!res.ok) {
+    const errorBody = await res.text();
+    throw new Error(`Ollama API失敗 (${res.status}): ${errorBody}`);
+  }
+
+  const data = await res.json();
+  const resultText = data.choices?.[0]?.message?.content;
+  if (!resultText) throw new Error("Ollamaから有効な応答が得られませんでした");
+  return resultText.trim();
+}
+
 // popup.js からのメッセージを処理
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === "fetchPrompts") {
@@ -962,6 +1169,22 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     chrome.storage.local.get(["promptMeta"], (data) => {
       sendResponse({ meta: data.promptMeta || null });
     });
+    return true;
+  }
+  if (message.action === "fetchOllamaModels") {
+    const baseUrl = (message.baseUrl || "http://localhost:11434").replace(/\/+$/, "");
+    fetch(baseUrl + "/api/tags")
+      .then(res => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
+      .then(data => {
+        const models = (data.models || []).map(m => m.name);
+        sendResponse({ success: true, models });
+      })
+      .catch(err => {
+        sendResponse({ success: false, error: err.message });
+      });
     return true;
   }
 });
