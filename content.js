@@ -130,7 +130,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       if (lastRightClickedElement) {
         // OAP・A単独・SBARモードの場合は既存テキストに追記する
         let finalValue = message.value;
-        if (message.mode === "a-only" || message.mode === "oap" || message.mode === "sbar") {
+        if (message.mode === "a-only" || message.mode === "oap" || message.mode === "sbar" || message.mode === "soap") {
           const currentValue = lastRightClickedElement.isContentEditable
             ? lastRightClickedElement.innerText
             : lastRightClickedElement.value;
