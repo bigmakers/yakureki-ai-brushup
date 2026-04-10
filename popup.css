@@ -85,7 +85,8 @@ button#saveBtn:hover {
 }
 
 .provider-toggle,
-.model-toggle {
+.model-toggle,
+.volume-toggle {
   display: flex;
   gap: 0;
   border: 1px solid #dadce0;
@@ -94,7 +95,8 @@ button#saveBtn:hover {
 }
 
 .provider-btn,
-.model-btn {
+.model-btn,
+.volume-btn {
   flex: 1;
   padding: 6px 8px;
   background: white;
@@ -108,23 +110,27 @@ button#saveBtn:hover {
 }
 
 .provider-btn + .provider-btn,
-.model-btn + .model-btn {
+.model-btn + .model-btn,
+.volume-btn + .volume-btn {
   border-left: 1px solid #dadce0;
 }
 
 .provider-btn:hover,
-.model-btn:hover {
+.model-btn:hover,
+.volume-btn:hover {
   background: #e8f0fe;
 }
 
 .provider-btn.active,
-.model-btn.active {
+.model-btn.active,
+.volume-btn.active {
   background: #1a73e8;
   color: white;
 }
 
 .provider-btn.active:hover,
-.model-btn.active:hover {
+.model-btn.active:hover,
+.volume-btn.active:hover {
   background: #1557b0;
 }
 
@@ -192,6 +198,42 @@ button#saveBtn:hover {
   font-size: 11px;
   color: #888;
   margin-top: 4px;
+}
+
+.fetch-models-btn {
+  width: 100%;
+  padding: 6px;
+  background: #5f6368;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+  margin-bottom: 6px;
+}
+
+.fetch-models-btn:hover {
+  background: #3c4043;
+}
+
+.fetch-models-btn:disabled {
+  background: #b0b3b8;
+  cursor: not-allowed;
+}
+
+.ollama-model-toggle {
+  flex-wrap: wrap;
+}
+
+.ollama-model-toggle .model-btn {
+  min-width: 0;
+  padding: 6px 10px;
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .divider {

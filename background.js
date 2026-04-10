@@ -68,7 +68,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     chrome.tabs.sendMessage(tab.id, { action: "showLoading" });
 
     // APIキー・プロバイダー・モデル設定・重視項目を取得
-    const { apiKeys, aiProvider, aiModel, focusItems, focusComment } = await chrome.storage.sync.get(["apiKeys", "aiProvider", "aiModel", "focusItems", "focusComment"]);
+    const { apiKeys, aiProvider, aiModel, focusItems, focusComment, outputVolume } = await chrome.storage.sync.get(["apiKeys", "aiProvider", "aiModel", "focusItems", "focusComment", "outputVolume"]);
     const provider = aiProvider || "gemini";
     const model = aiModel || "gemini-flash";
     const apiKey = apiKeys?.[provider];
@@ -94,7 +94,8 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     // AIを呼び出し
     const currentFocusItems = Array.isArray(focusItems) ? focusItems : [];
     const currentFocusComment = focusComment || "";
-    const brushedUp = await callAI(provider, model, apiKey, response.value, response.prescription || "", response.pastData || "", hasShiB, hasYakuB, hasYaku3A, hasYaku3B, hasYakuC, hasFukuBHa, currentFocusItems, currentFocusComment, mode);
+    const currentOutputVolume = outputVolume || 70;
+    const brushedUp = await callAI(provider, model, apiKey, response.value, response.prescription || "", response.pastData || "", hasShiB, hasYakuB, hasYaku3A, hasYaku3B, hasYakuC, hasFukuBHa, currentFocusItems, currentFocusComment, mode, currentOutputVolume);
 
     // 結果をテキストエリアに書き戻し
     chrome.tabs.sendMessage(tab.id, {
@@ -291,7 +292,6 @@ ${pastData}
   return `あなたは薬剤師向けの薬歴記録（SOAP形式）のナビゲーションアシスタントです。
 以下の薬歴内容、今回の処方内容、過去データを元に、SOAP形式で書き直してください。
 薬歴内容が空の場合は、処方内容を元にSOAPを新規作成してください。
-重要：出力量は通常の70%程度に抑えること。各セクションを簡潔にまとめ、冗長な記述は避ける。要点を絞って記載すること。
 ${prescriptionSection}${pastDataSection}■ まず処方内容を分析し、内服薬のみか、外用薬のみか、混在かを判断すること。
 処方タイプによって以下のように書き分ける。
 
@@ -959,7 +959,7 @@ ${text}`;
 }
 
 // AI呼び出しの振り分け
-async function callAI(provider, model, apiKey, text, prescription, pastData, hasShiB, hasYakuB, hasYaku3A, hasYaku3B, hasYakuC, hasFukuBHa, focusItems, focusComment, mode) {
+async function callAI(provider, model, apiKey, text, prescription, pastData, hasShiB, hasYakuB, hasYaku3A, hasYaku3B, hasYakuC, hasFukuBHa, focusItems, focusComment, mode, outputVolume) {
   let prompt = null;
 
   // キャッシュされたテンプレートを優先
@@ -1004,6 +1004,15 @@ async function callAI(provider, model, apiKey, text, prescription, pastData, has
       prompt = buildPrompt(text, prescription, pastData, hasShiB, hasYakuB, hasYaku3A, hasYaku3B, hasYakuC, hasFukuBHa, focusItems, focusComment);
     }
   }
+
+  // 出力量指示を付与
+  const vol = outputVolume || 70;
+  if (vol <= 50) {
+    prompt = "重要：出力量は通常の50%程度に抑えること。最小限の要点のみ記載し、冗長な記述は避ける。\n\n" + prompt;
+  } else if (vol <= 70) {
+    prompt = "重要：出力量は通常の70%程度に抑えること。各セクションを簡潔にまとめ、要点を絞って記載すること。\n\n" + prompt;
+  }
+  // 100の場合は出力量制限なし
 
   switch (provider) {
     case "gemini":

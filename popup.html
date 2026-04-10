@@ -15,11 +15,12 @@
         <button type="button" class="provider-btn active" data-provider="gemini">Gemini</button>
         <button type="button" class="provider-btn" data-provider="openai">OpenAI</button>
         <button type="button" class="provider-btn" data-provider="claude">Claude</button>
+        <button type="button" class="provider-btn" data-provider="ollama">Ollama</button>
       </div>
     </div>
 
     <div class="form-group">
-      <label for="apiKey">APIキー</label>
+      <label for="apiKey" id="apiKeyLabel">APIキー</label>
       <input type="password" id="apiKey" placeholder="APIキーを入力">
       <p class="api-link" id="apiLink">
         <a href="https://aistudio.google.com/apikey" target="_blank" id="apiLinkAnchor">APIキーを取得する</a>
@@ -29,6 +30,10 @@
     <div class="form-group">
       <label>モデル</label>
       <div class="model-toggle" id="modelToggle"></div>
+      <div id="ollamaModelArea" style="display:none;">
+        <button type="button" id="fetchModelsBtn" class="fetch-models-btn">モデル一覧を取得</button>
+        <div class="model-toggle ollama-model-toggle" id="ollamaModelToggle"></div>
+      </div>
       <p class="model-hint" id="modelHint"></p>
     </div>
 
@@ -43,6 +48,16 @@
       </div>
       <textarea id="focusComment" placeholder="その他の指示やコメント（例：血圧の経過に注目、転倒リスクに注意 等）" rows="2"></textarea>
       <p class="focus-hint">選択した項目を薬歴のA・Pで重点的に評価します</p>
+    </div>
+
+    <div class="form-group">
+      <label>情報量</label>
+      <div class="volume-toggle" id="volumeToggle">
+        <button type="button" class="volume-btn" data-volume="50">少なめ</button>
+        <button type="button" class="volume-btn active" data-volume="70">標準</button>
+        <button type="button" class="volume-btn" data-volume="100">多め</button>
+      </div>
+      <p class="model-hint" id="volumeHint">標準：要点を絞って簡潔に記載</p>
     </div>
 
     <button id="saveBtn">保存</button>
