@@ -16,8 +16,8 @@ chrome.runtime.onInstalled.addListener(() => {
     contexts: ["editable"]
   });
   chrome.contextMenus.create({
-    id: "brushup-yakureki-sbar",
-    title: "薬歴をAIでナビゲーション（SBAR）",
+    id: "brushup-yakureki-r",
+    title: "薬歴をAIでナビゲーション（R：介護者向け提案）",
     contexts: ["editable"]
   });
 
@@ -45,10 +45,10 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   const isSOAP = info.menuItemId === "brushup-yakureki";
   const isOAP = info.menuItemId === "brushup-yakureki-oap";
   const isAOnly = info.menuItemId === "brushup-yakureki-a";
-  const isSBAR = info.menuItemId === "brushup-yakureki-sbar";
-  if (!isSOAP && !isOAP && !isAOnly && !isSBAR) return;
+  const isR = info.menuItemId === "brushup-yakureki-r";
+  if (!isSOAP && !isOAP && !isAOnly && !isR) return;
 
-  const mode = isSBAR ? "sbar" : (isAOnly ? "a-only" : (isOAP ? "oap" : "soap"));
+  const mode = isR ? "r" : (isAOnly ? "a-only" : (isOAP ? "oap" : "soap"));
 
   try {
     // content.jsからテキストエリアの内容を取得
@@ -144,8 +144,8 @@ const PROMPT_BASE_URL = "https://raw.githubusercontent.com/bigmakers/yakureki-ai
 function getFlagText(flagName, flagValue, context) {
   switch (flagName) {
     case "hasShiB":
-      if (context === "sbar") {
-        return flagValue ? "■ 一包化に関する情報：\n- 一包化が行われている患者である。必要に応じてSBARの中で言及すること。" : "";
+      if (context === "r") {
+        return flagValue ? "■ 一包化に関する情報：\n- 一包化が行われている患者である。服薬管理のしやすさについて提案に含めること。" : "";
       } else if (context === "a-only") {
         return `■ 一包化に関するルール（この判定は確定済みなので従うこと）：\n- 一包化: ${flagValue ? "該当する" : "該当しない"}\n${flagValue ? "- 一包化を行っている旨をAの中で適切に言及すること（例：「一包化により服薬管理を支援している。」）" : "- 一包化に関する記述は行わないこと"}`;
       } else {
@@ -155,28 +155,28 @@ function getFlagText(flagName, flagValue, context) {
 
     case "hasYakuB":
       if (context === "a-only") return "";
-      if (context === "sbar") {
-        return flagValue ? "■ お薬手帳に関する情報：\n- お薬手帳の持参がなかった。必要に応じて医師への情報共有としてSBARの中で言及すること。" : "";
+      if (context === "r") {
+        return flagValue ? "■ お薬手帳に関する情報：\n- お薬手帳の持参がなかった。介護者にお薬手帳の重要性を伝える提案を含めること。" : "";
       }
       return `■ お薬手帳に関するルール（この判定は確定済みなので従うこと）：\n- お薬手帳持参なし: ${flagValue ? "記載する" : "記載しない"}\n${flagValue ? "- 今回の処方に薬Bフラグがあるため、お薬手帳の持参がなかったと判断する\n- Oに「お薬手帳の持参なし。」と記載すること\n- Pに「お薬手帳を持参することで、他院や他薬局との薬の重複・相互作用の確認ができるため、次回は持参するよう説明した。」と記載すること" : "- お薬手帳未持参に関する記述は行わないこと"}`;
 
     case "hasYaku3A":
       if (context === "a-only") return "";
-      if (context === "sbar") {
-        return flagValue ? "■ 施設管理に関する情報：\n- 施設入所中の患者で、施設職員と情報交換を行った。必要に応じてSBARの中で言及すること。" : "";
+      if (context === "r") {
+        return flagValue ? "■ 施設管理に関する情報：\n- 施設入所中の患者で、施設職員と情報交換を行った。施設での介護に役立つ提案を意識すること。" : "";
       }
       return `■ 施設管理に関するルール（この判定は確定済みなので従うこと）：\n- 薬3Aフラグ（施設管理・情報交換あり）: ${flagValue ? "該当する" : "該当しない"}\n${flagValue ? "- 今回の処方に薬3Aフラグがあるため、施設管理の患者と判断する\n- Oに「施設入所中。施設職員と情報交換を行った。」と記載すること\n- Pに「引き続き施設職員と連携し、服薬状況や体調変化について情報共有を行う。」と記載すること" : "- 薬3Aに関する記述は行わないこと"}`;
 
     case "hasYaku3B":
       if (context === "a-only") return "";
-      if (context === "sbar") {
-        return flagValue ? "■ 施設管理に関する情報：\n- 施設入所中の患者で、お薬手帳情報の共有が必要。必要に応じてSBARの中で言及すること。" : "";
+      if (context === "r") {
+        return flagValue ? "■ 施設管理に関する情報：\n- 施設入所中の患者で、お薬手帳情報の共有が必要。施設での服薬管理について提案に含めること。" : "";
       }
       return `- 薬3Bフラグ（施設管理・お薬手帳情報共有）: ${flagValue ? "該当する" : "該当しない"}\n${flagValue ? "- 今回の処方に薬3Bフラグがあるため、施設管理の患者でお薬手帳情報の共有が必要と判断する\n- Oに「施設入所中。」と記載すること\n- Pに「施設にお薬手帳の情報を共有し、服薬管理に役立てていただく。」と記載すること" : "- 薬3Bに関する記述は行わないこと"}`;
 
     case "hasYakuC":
-      if (context === "sbar") {
-        return flagValue ? "■ 3ヶ月以上来局なし（薬C）に関する情報：\n- 前回来局から3ヶ月以上経過している。久しぶりの来局である点をSBARの背景情報に含めること。" : "";
+      if (context === "r") {
+        return flagValue ? "■ 3ヶ月以上来局なし（薬C）に関する情報：\n- 前回来局から3ヶ月以上経過している。久しぶりの来局である点を踏まえた提案を含めること。" : "";
       }
       if (context === "a-only") {
         return `■ 3ヶ月以上来局なし（薬C）に関するルール（この判定は確定済みなので従うこと）：\n- 薬Cフラグ: ${flagValue ? "該当する" : "該当しない"}\n${flagValue ? "- 今回の処方に薬Cフラグがあるため、前回来局から3ヶ月以上経過していると判断する\n- たとえ過去データに同じ薬があっても「定期処方の継続」とは扱わず、Aでは処方妥当性を改めて評価すること" : "- 薬Cに関する特別な扱いは不要"}`;
@@ -189,8 +189,8 @@ function getFlagText(flagName, flagValue, context) {
 
     case "hasFukuBHa":
       if (context === "a-only") return "";
-      if (context === "sbar") {
-        return flagValue ? "■ 服薬情報提供（服Bハ）に関する情報：\n- ケアマネジャーへの服薬情報提供を行った。必要に応じてSBARの中で言及すること。" : "";
+      if (context === "r") {
+        return flagValue ? "■ 服薬情報提供（服Bハ）に関する情報：\n- ケアマネジャーへの服薬情報提供を行った。ケアマネジャーとの連携に関する提案を含めること。" : "";
       }
       return `■ 服薬情報提供（服Bハ）に関するルール（この判定は確定済みなので従うこと）：\n- 服Bハフラグ（服薬情報提供2・ケアマネへの情報提供）: ${flagValue ? "該当する" : "該当しない"}\n${flagValue ? "- 今回の処方に服Bハフラグがあるため、ケアマネジャーへの服薬情報提供を行ったと判断する\n- Oに「服薬情報提供2：担当ケアマネジャーに対し、現在の内服状況について情報提供を行った。最新の薬剤情報を提供した。」と記載すること\n- Pに「引き続きケアマネジャーと連携し、服薬状況や処方変更があれば情報提供を行う。」と記載すること" : "- 服Bハに関する記述は行わないこと"}`;
 
@@ -233,7 +233,7 @@ async function fetchPromptTemplates() {
   if (!metaRes.ok) throw new Error(`meta.json取得失敗 (${metaRes.status})`);
   const meta = await metaRes.json();
 
-  const [soap, oap, aOnly, sbar] = await Promise.all([
+  const [soap, oap, aOnly, rTemplate] = await Promise.all([
     fetch(`${PROMPT_BASE_URL}/soap.txt`, { cache: "no-store" }).then(r => {
       if (!r.ok) throw new Error(`soap.txt取得失敗 (${r.status})`);
       return r.text();
@@ -246,9 +246,9 @@ async function fetchPromptTemplates() {
       if (!r.ok) throw new Error(`a-only.txt取得失敗 (${r.status})`);
       return r.text();
     }),
-    fetch(`${PROMPT_BASE_URL}/sbar.txt`, { cache: "no-store" }).then(r => {
+    fetch(`${PROMPT_BASE_URL}/r.txt`, { cache: "no-store" }).then(r => {
       if (!r.ok) {
-        console.warn("[薬歴AI] sbar.txt取得失敗、ハードコードを使用します");
+        console.warn("[薬歴AI] r.txt取得失敗、ハードコードを使用します");
         return null;
       }
       return r.text();
@@ -256,7 +256,7 @@ async function fetchPromptTemplates() {
   ]);
 
   const cachedPrompts = { soap, oap, "a-only": aOnly };
-  if (sbar) cachedPrompts.sbar = sbar;
+  if (rTemplate) cachedPrompts.r = rTemplate;
 
   await chrome.storage.local.set({
     cachedPrompts,
@@ -291,6 +291,7 @@ ${pastData}
   return `あなたは薬剤師向けの薬歴記録（SOAP形式）のナビゲーションアシスタントです。
 以下の薬歴内容、今回の処方内容、過去データを元に、SOAP形式で書き直してください。
 薬歴内容が空の場合は、処方内容を元にSOAPを新規作成してください。
+重要：出力量は通常の70%程度に抑えること。各セクションを簡潔にまとめ、冗長な記述は避ける。要点を絞って記載すること。
 ${prescriptionSection}${pastDataSection}■ まず処方内容を分析し、内服薬のみか、外用薬のみか、混在かを判断すること。
 処方タイプによって以下のように書き分ける。
 
@@ -860,8 +861,8 @@ ${focusSection}■ 注意事項：
 ${text}`;
 }
 
-// SBAR モード用プロンプトを組み立てる（薬剤師→医師への報告）
-function buildSBARPrompt(text, prescription, pastData, hasShiB, hasYakuB, hasYaku3A, hasYaku3B, hasYakuC, hasFukuBHa, focusItems, focusComment) {
+// R モード用プロンプトを組み立てる（介護者向け提案）
+function buildRPrompt(text, prescription, pastData, hasShiB, hasYakuB, hasYaku3A, hasYaku3B, hasYakuC, hasFukuBHa, focusItems, focusComment) {
   let prescriptionSection = "";
   if (prescription) {
     prescriptionSection = `
@@ -883,84 +884,75 @@ ${pastData}
 
   const focusSection = buildFocusSection(focusItems, focusComment);
 
-  return `あなたは薬剤師向けのSBAR作成アシスタントです。
-薬歴内容・処方内容・過去データを元に、薬剤師から医師へのSBARを作成してください。
+  return `あなたは薬剤師として、介護者（ご家族・施設職員・ヘルパーなど）に向けた提案を作成するアシスタントです。
+薬歴内容・処方内容・過去データを元に、患者さんの処方薬に関連した介護に役立つ提案を作成してください。
 薬歴内容が空の場合は処方内容を元に新規作成してください。
-重要：出力は簡潔にすること。各セクション2〜3文程度。全体で10〜15行程度に収める。
 ${prescriptionSection}${pastDataSection}
-=== SBAR形式の書き方 ===
+=== 介護者向け提案の書き方 ===
 
-【S】状況
-- 現在の処方状況を1文で簡潔に記載する
-- 患者の氏名は記載しない
-  （例：「降圧薬2剤と糖尿病薬の処方です。」）
+処方されている薬の効果・副作用・注意点をふまえ、以下の観点から介護に役立つ具体的な提案を記載すること。
+該当しない項目は省略してよい。全項目を無理に書く必要はない。処方内容に関連する項目を優先すること。
 
-【B】背景
-- 報告に必要な背景を簡潔に記載する（前回処方との変更点、経過など）
-  （例：「前回からアムロジピンが追加されています。」）
+【災害時】
+- 処方薬に関する災害時の備え・注意点
+  （例：「お薬手帳のコピーを非常用持ち出し袋に入れておくと安心です。」）
+  （例：「インスリンは保冷バッグで保管し、予備の注射針も備えておきましょう。」）
 
-【A】アセスメント
-- 薬学的評価を簡潔に記載する
-  （例：「併用による過降圧のリスクに注意が必要と考えます。」）
+【食事】
+- 処方薬と食事の関係（食前・食後・食事内容の注意点など）
+  （例：「ワーファリン服用中のため、納豆・青汁・クロレラは避けましょう。」）
+  （例：「カリウム値に注意が必要なので、バナナや果物の摂りすぎに注意してください。」）
 
-【R】提案
-- マイルドなトーンで、医師の判断を尊重する形で記載する
-- 基本的には以下のような文章でよい：
-  「用法用量の変更の指示があればお願いします。経過観察での注意点などあればご指示お願いします。」
-- 薬学的に気になる点がある場合のみ、それを簡潔に添える
-  （例：「○○の点が少し気になりました。用法用量の変更の指示があればお願いします。経過観察での注意点などあればご指示お願いします。」）
+【排泄】
+- 処方薬が排泄に与える影響と対処法
+  （例：「利尿薬を飲んでいるため、トイレが近くなります。外出時はトイレの場所を事前に確認しておきましょう。」）
+  （例：「便秘を起こしやすい薬があるため、水分摂取と食物繊維を意識しましょう。」）
 
-=== 報告すべき事項が特にない場合 ===
-処方に問題がなければ、簡潔に確認結果を報告し、Rは「用法用量の変更の指示があればお願いします。経過観察での注意点などあればご指示お願いします。」で締める。
+【睡眠】
+- 処方薬と睡眠の関係、注意点
+  （例：「睡眠薬を服用しているため、夜間のトイレ時の転倒に注意してください。」）
+  （例：「就寝前の服用を忘れないよう、枕元に薬を準備しておきましょう。」）
 
-${hasShiB ? "■ 一包化に関する情報：\n- 一包化が行われている患者である。必要に応じてSBARの中で言及すること。\n" : ""}
-${hasYakuB ? "■ お薬手帳に関する情報：\n- お薬手帳の持参がなかった。必要に応じて医師への情報共有としてSBARの中で言及すること。\n" : ""}
-${hasYaku3A ? "■ 施設管理に関する情報：\n- 施設入所中の患者で、施設職員と情報交換を行った。必要に応じてSBARの中で言及すること。\n" : ""}
-${hasYaku3B ? "■ 施設管理に関する情報：\n- 施設入所中の患者で、お薬手帳情報の共有が必要。必要に応じてSBARの中で言及すること。\n" : ""}
-${hasYakuC ? "■ 3ヶ月以上来局なし（薬C）に関する情報：\n- 前回来局から3ヶ月以上経過している。久しぶりの来局である点をSBARの背景情報に含めること。\n" : ""}
-${hasFukuBHa ? "■ 服薬情報提供（服Bハ）に関する情報：\n- ケアマネジャーへの服薬情報提供を行った。必要に応じてSBARの中で言及すること。\n" : ""}
+【運動】
+- 処方薬と運動・活動の関係、注意点
+  （例：「降圧薬を飲んでいるため、急な立ち上がりでふらつくことがあります。ゆっくり動くようにしましょう。」）
+  （例：「血糖降下薬を使っているので、運動時の低血糖に注意してください。飴やブドウ糖を携帯しましょう。」）
+
+【社会活動】
+- 処方薬を踏まえた社会参加・外出時のアドバイス
+  （例：「デイサービスに行く日は、朝の薬を忘れずに飲んでから出かけましょう。」）
+  （例：「外出先でも薬を飲めるよう、1回分を小分けにして持ち歩くと便利です。」）
+
+【季節】
+- 現在の季節に合わせた処方薬に関する注意点
+  （例：「夏場は利尿薬による脱水に注意が必要です。こまめに水分を摂りましょう。」）
+  （例：「冬場は血圧が上がりやすいため、暖かい環境を保つようにしましょう。」）
+
+${hasShiB ? "■ 一包化に関する情報：\n- 一包化が行われている患者である。服薬管理のしやすさについて提案に含めること。\n" : ""}
+${hasYaku3A ? "■ 施設管理に関する情報：\n- 施設入所中の患者で、施設職員と情報交換を行った。施設での介護に役立つ提案を意識すること。\n" : ""}
+${hasYaku3B ? "■ 施設管理に関する情報：\n- 施設入所中の患者で、お薬手帳情報の共有が必要。施設での服薬管理について提案に含めること。\n" : ""}
+${hasFukuBHa ? "■ 服薬情報提供（服Bハ）に関する情報：\n- ケアマネジャーへの服薬情報提供を行った。ケアマネジャーとの連携に関する提案を含めること。\n" : ""}
 ${focusSection}■ 注意事項：
-- 処方内容に含まれる医薬品名を把握し、SBARの内容に反映すること
-- 誤字脱字を修正すること
-- 医療・薬学の専門用語を適正に使用すること
+- 処方内容に含まれる医薬品名を把握し、提案の内容に反映すること
+- 介護者にわかりやすい平易な言葉を使うこと（専門用語は避け、使う場合は簡単な説明を添える）
 - 文章は簡潔かつ明確にすること
-- 医師への報告文として適切な丁寧語を使用すること
-- 改善したSBARのみを出力すること。説明や補足は不要です。
+- 温かみのある、寄り添うトーンで記載すること
+- 提案のみを出力すること。説明や補足は不要です。
 
 ■ 禁止事項（以下は絶対に守ること）：
 - 「支B内服+2のため、」という表現は使用しない
 - アスタリスク(*)、シャープ(#)、バッククォート(\`)などのマークダウン記法は一切使用しないこと。プレーンテキストで出力すること。
 - 出力は日本語と英単語（医薬品名等）のみとすること。ロシア語、中国語、韓国語、その他の言語は絶対に使用しないこと。
-- 「オンライン診療」「オンライン服薬指導」「オンライン」という表現は一切使用しないこと。当施設ではオンライン診療は行っていない。
-
-■ ハイリスク薬について：
-処方内容に[H]マークが付いている薬剤（DOAC、抗血小板薬、糖尿病用剤、精神神経用薬など）がある場合、SBARの下に以下のセクションを追加する。
-
----出力フォーマット---
-（SBARの後に改行して）
-
-ハイリスク薬
-- [該当する薬剤名]：[注意項目のチェック内容を簡潔に記載]
-（複数あれば薬剤ごとに記載）
-
----ルール---
-- 注意項目のチェックのみ記載する（副作用詳細の確認チェックは不要）
-- 患者の年齢・性別が推測できる場合、それと矛盾する記載は行わないこと
-- [H]マークの薬剤がない場合は、このセクション自体を出力しない
+- 「オンライン診療」「オンライン服薬指導」「オンライン」という表現は一切使用しないこと。
 
 ■ 最終整合性チェック（出力前に必ず以下を確認すること）：
-1. S/B/A/Rの内容が互いに矛盾していないか確認する
-2. 処方内容に記載された医薬品がSBARの中で正しく言及されているか確認する
-3. 禁止事項に該当する表現が含まれていないか確認する
-4. 日本語と英単語以外の言語が含まれていないか確認する
-5. マークダウン記法が含まれていないか確認する
-6. [H]マークの薬剤がある場合、ハイリスク薬セクションが出力されているか確認する
-7. ハイリスク薬の注意項目が患者の年齢・性別と矛盾していないか確認する
-8. 医師への報告として適切な丁寧語・敬語が使われているか確認する
-9. 提案（R）がマイルドなトーンで、医師の判断を尊重する表現になっているか確認する。指示的・断定的な表現になっていないか確認する
-10. 「オンライン診療」「オンライン服薬指導」「オンライン」という表現が含まれていないか確認する
-11. 過去データを参照する際、「前回」と「前々回」を取り違えていないか確認する
-12. 不整合があれば修正してから出力すること
+1. 処方内容に記載された医薬品が提案の中で正しく反映されているか確認する
+2. 禁止事項に該当する表現が含まれていないか確認する
+3. 日本語と英単語以外の言語が含まれていないか確認する
+4. マークダウン記法が含まれていないか確認する
+5. 介護者にわかりやすい表現になっているか確認する
+6. 過去データを参照する際、「前回」と「前々回」を取り違えていないか確認する
+7. 不整合があれば修正してから出力すること
 
 薬歴内容：
 ${text}`;
@@ -1006,8 +998,8 @@ async function callAI(provider, model, apiKey, text, prescription, pastData, has
       prompt = buildAOnlyPrompt(text, prescription, pastData, hasShiB, hasYakuB, hasYaku3A, hasYaku3B, hasYakuC, hasFukuBHa, focusItems, focusComment);
     } else if (mode === "oap") {
       prompt = buildOAPPrompt(text, prescription, pastData, hasShiB, hasYakuB, hasYaku3A, hasYaku3B, hasYakuC, hasFukuBHa, focusItems, focusComment);
-    } else if (mode === "sbar") {
-      prompt = buildSBARPrompt(text, prescription, pastData, hasShiB, hasYakuB, hasYaku3A, hasYaku3B, hasYakuC, hasFukuBHa, focusItems, focusComment);
+    } else if (mode === "r") {
+      prompt = buildRPrompt(text, prescription, pastData, hasShiB, hasYakuB, hasYaku3A, hasYaku3B, hasYakuC, hasFukuBHa, focusItems, focusComment);
     } else {
       prompt = buildPrompt(text, prescription, pastData, hasShiB, hasYakuB, hasYaku3A, hasYaku3B, hasYakuC, hasFukuBHa, focusItems, focusComment);
     }
