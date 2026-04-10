@@ -278,3 +278,29 @@ button#saveBtn:hover {
   background: #94d3b2;
   cursor: not-allowed;
 }
+
+.log-btn {
+  background: #5f6368;
+  margin-bottom: 6px;
+}
+
+.log-btn:hover {
+  background: #3c4043;
+}
+
+.clear-log-btn {
+  width: 100%;
+  padding: 6px;
+  background: white;
+  color: #d93025;
+  border: 1px solid #dadce0;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.clear-log-btn:hover {
+  background: #fce8e6;
+}

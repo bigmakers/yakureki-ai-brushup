@@ -958,6 +958,30 @@ ${focusSection}■ 注意事項：
 ${text}`;
 }
 
+// ログ保存
+async function saveLog(sentPrompt, receivedResponse, mode, provider, model) {
+  try {
+    const { logs = [] } = await chrome.storage.local.get(["logs"]);
+    const entry = {
+      datetime: new Date().toISOString(),
+      mode,
+      provider,
+      model,
+      sentPrompt,
+      receivedResponse
+    };
+    logs.push(entry);
+    // 直近100件のみ保持（storage容量対策）
+    if (logs.length > 100) {
+      logs.splice(0, logs.length - 100);
+    }
+    await chrome.storage.local.set({ logs });
+    console.log("[薬歴AI] ログ保存完了:", entry.datetime);
+  } catch (e) {
+    console.error("[薬歴AI] ログ保存エラー:", e);
+  }
+}
+
 // AI呼び出しの振り分け
 async function callAI(provider, model, apiKey, text, prescription, pastData, hasShiB, hasYakuB, hasYaku3A, hasYaku3B, hasYakuC, hasFukuBHa, focusItems, focusComment, mode, outputVolume) {
   let prompt = null;
@@ -1014,18 +1038,28 @@ async function callAI(provider, model, apiKey, text, prescription, pastData, has
   }
   // 100の場合は出力量制限なし
 
+  let result;
   switch (provider) {
     case "gemini":
-      return await callGemini(apiKey, prompt, model);
+      result = await callGemini(apiKey, prompt, model);
+      break;
     case "openai":
-      return await callOpenAI(apiKey, prompt, model);
+      result = await callOpenAI(apiKey, prompt, model);
+      break;
     case "claude":
-      return await callClaude(apiKey, prompt, model);
+      result = await callClaude(apiKey, prompt, model);
+      break;
     case "ollama":
-      return await callOllama(apiKey, prompt, model);
+      result = await callOllama(apiKey, prompt, model);
+      break;
     default:
       throw new Error("不明なプロバイダー: " + provider);
   }
+
+  // ログ保存
+  saveLog(prompt, result, mode, provider, model);
+
+  return result;
 }
 
 // Gemini API

@@ -303,6 +303,42 @@ function showStatus(message, type) {
   statusEl.className = "status " + type;
 }
 
+// ログセクション
+const downloadLogBtn = document.getElementById("downloadLogBtn");
+const clearLogBtn = document.getElementById("clearLogBtn");
+const logStatusEl = document.getElementById("logStatus");
+
+downloadLogBtn.addEventListener("click", () => {
+  chrome.storage.local.get(["logs"], (data) => {
+    const logs = data.logs || [];
+    if (logs.length === 0) {
+      logStatusEl.textContent = "ログがありません";
+      logStatusEl.className = "status error";
+      return;
+    }
+    const json = JSON.stringify(logs, null, 2);
+    const blob = new Blob([json], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const now = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+    a.href = url;
+    a.download = `yakureki-log-${now}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    logStatusEl.textContent = `${logs.length}件のログをダウンロードしました`;
+    logStatusEl.className = "status success";
+  });
+});
+
+clearLogBtn.addEventListener("click", () => {
+  if (confirm("ログをすべて削除しますか？")) {
+    chrome.storage.local.set({ logs: [] }, () => {
+      logStatusEl.textContent = "ログをクリアしました";
+      logStatusEl.className = "status success";
+    });
+  }
+});
+
 // プロンプト更新セクション
 const fetchPromptsBtn = document.getElementById("fetchPromptsBtn");
 const fetchStatusEl = document.getElementById("fetchStatus");

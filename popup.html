@@ -66,6 +66,15 @@
     <hr class="divider">
 
     <div class="prompt-section">
+      <label>ログ</label>
+      <button id="downloadLogBtn" class="fetch-btn log-btn">ログをダウンロード（JSON）</button>
+      <button id="clearLogBtn" class="clear-log-btn">ログをクリア</button>
+      <div id="logStatus" class="status"></div>
+    </div>
+
+    <hr class="divider">
+
+    <div class="prompt-section">
       <label>プロンプト更新</label>
       <div class="prompt-meta" id="promptMeta">
         <span class="meta-label">バージョン:</span> <span id="promptVersion">未取得</span>
